@@ -1,6 +1,7 @@
 # OSM Can-BICS
+![Bicycle facilities across Canada](figures/glow.png?raw=true "Bicycle facilities across Canada")
 
-OSM Can-BICS classifies OpenStreetMap (OSM) data, according to the Canadian Bikeway Comfort and Safety Classification System (Can-BICS). The goal is to create a national map of bicycling facilities that is up-to-date, detailed, and uses lables that are meaningful for cycling safety and preference research.
+OSM Can-BICS classifies [OpenStreetMap (OSM)](https://www.openstreetmap.org/) data, according to the [Canadian Bikeway Comfort and Safety Classification System (Can-BICS)](https://www.canada.ca/en/public-health/services/reports-publications/health-promotion-chronic-disease-prevention-canada-research-policy-practice/vol-40-no-9-2020/canbics-classification-system-naming-convention-cycling-infrastructure.html). The goal is to create a national map of bicycling facilities that is up-to-date, detailed, and uses lables that are meaningful for cycling safety and preference research.
 
 There are two main sections:
 1. Analyse 15 Sample cities to develop the classification and use reference data to perform an accuracy assessment.
