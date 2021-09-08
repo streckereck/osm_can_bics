@@ -26,7 +26,7 @@ Two additional steps are needed to download large files for the 15 sample cities
   * supporting functions are locaed in `/code/Can_BICS_OSM_functions.R`
 2. `/code/sample_cities/overall_accuracy.RMD` generates an accuracy assessment. Requres that classify.R has been run.
 
-![Classification algorithm](figures/classifiation.png?raw=true "Classification algorithm")
+![Classification algorithm](figures/classify.png?raw=true "Classification algorithm")
 **Figure 1** Classification algorithm.
 
 ## National dataset
