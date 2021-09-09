@@ -22,16 +22,16 @@ roundabouts <- st_read("data/sample_cities/roundabouts.gpkg")
 
 # classify
 
-highways_all_classified <- classify_highways(highways_all,
+highways_all_predicted <- classify_highways(highways_all,
                                              selected_csds,
                                              roundabouts) 
-st_write(highways_test,
-         "data/sample_cities/generated/highways_all_predicted.gpkg",
+st_write(highways_all_predicted,
+         "data/sample_cities/highways_all_predicted.gpkg",
          delete_layer = T)
 
 # reference
 reference_predicted <- classify_training_data(reference_data,
-                                             highways_test)
+                                              highways_all_predicted)
 
-st_write(reference_predicted, "data/sample_cities/generated/reference_predicted.gpkg",
+st_write(reference_predicted, "data/sample_cities/reference_predicted.gpkg",
          delete_layer = T)
