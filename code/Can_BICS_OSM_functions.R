@@ -674,8 +674,6 @@ osm_link <- function(featureID){
 ################################################################################
 # Accuracy assessment
 ################################################################################
-library(caret)
-
 # recode ground data
 ground_data_recode_infratype <- function(Can_BICS){
   Can_BICS_recode <- recode(Can_BICS,
@@ -687,8 +685,6 @@ ground_data_recode_infratype <- function(Can_BICS){
 }
 
 # levels in order are:
-
-
 infra_comfort_levels_recode <- function(comfort_levels){
   recode(comfort_levels,
          "1. High comfort" = "1. High Comfort",
