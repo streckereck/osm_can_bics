@@ -1,5 +1,4 @@
 # Functions to classify OSM Can-BICS infrastructure type
-
 library(lwgeom)
 library(raster)
 library(sf)
