@@ -1,8 +1,7 @@
 # Functions to classify OSM Can-BICS infrastructure type
 # each section needs to be run sequentially
 
-library(caret)
-library(janitor)
+library(knitr)
 library(lwgeom)
 library(mapview)
 library(raster)
