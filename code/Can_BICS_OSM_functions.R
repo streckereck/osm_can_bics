@@ -456,7 +456,8 @@ desired_osm_columns <- c("osm_id", "name", "bicycle", "bridge",
                          "national_cycle_network", "national_cycle_network_name",
                          "mtb.scale.imba", "mtb.scale", "mtb", "sac_scale", 
                          "access", "natural", "nat_count")
-desired_ground_columns <- c("sample_id", "CSDNAME", "Can_BICS_stratum",
+desired_ground_columns <- c("sample_id", "CSDNAME", "CSDUID",
+                            "Can_BICS_stratum",
                             "Can_BICS_stratum_class", "streetview_image",
                             "street_view_image_date", "interpreter",
                             "reviewed", "revised_value_from_review", "notes",
@@ -697,53 +698,6 @@ infra_comfort_levels_recode <- function(comfort_levels){
 
 
 
-Can_BICS_accuracy_assessment <- function(reference,
-                                         predicted){
-  # convert to factors with the same order
-  reference.levels = factor(reference,
-                            levels = infra_levels)
-  
-  predicted.levels = factor(predicted, 
-                            levels = infra_levels)
-  
-  confusion_matrix <- confusionMatrix(predicted.levels,
-                                      reference.levels)
-  
-  return(confusion_matrix)
-}
-
-Can_BICS_confusion_matrix <- function(accuracy_assessment){
-  
-  mat_tab <- accuracy_assessment %>% as.matrix("xtabs") %>%
-    data.frame()
-  
-  names(mat_tab) <- infra_levels
-  row.names(mat_tab) <- infra_levels
-  
-  
-  mat_tab$Total <- rowSums(mat_tab[,])
-  mat_tab[nrow(mat_tab) + 1,] <- colSums(mat_tab)
-  rownames(mat_tab)[nrow(mat_tab)] <- "Total"
-  
-  return(mat_tab)
-}
-
-Can_BICS_class_confusion_matrix <- function(accuracy_assessment){
-  
-  mat_tab <- accuracy_assessment %>% as.matrix("xtabs") %>%
-    data.frame()
-  
-  names(mat_tab) <- infra_comfort_levels
-  row.names(mat_tab) <- infra_comfort_levels
-  
-  
-  mat_tab$Total <- rowSums(mat_tab[,])
-  mat_tab[nrow(mat_tab) + 1,] <- colSums(mat_tab)
-  rownames(mat_tab)[nrow(mat_tab)] <- "Total"
-  
-  return(mat_tab)
-}
-
 Can_BICS_class_confusion_matrix_display <- 
   function(Can_BICS_class_confusion_matrix,
            lengths,
@@ -819,9 +773,9 @@ recode_presence_absense <- function(infra){
                    "Painted Bike Lane" = "Can-BICS")
 }
 
-Can_BICS_accuracy_assessment_v2 <- function(reference,
-                                            predicted,
-                                            common_levels){
+Can_BICS_accuracy_assessment <- function(reference,
+                                         predicted,
+                                         common_levels){
   # convert to factors with the same order
   reference_levels = factor(reference,
                             levels = common_levels)
@@ -837,9 +791,9 @@ Can_BICS_accuracy_assessment_v2 <- function(reference,
   return(confusion_matrix)
 }
 
-Can_BICS_confusion_matrix_display_v2 <- function(confusion_matrix,
-                                                    highways,
-                                                    categories){
+Can_BICS_confusion_matrix_display <- function(confusion_matrix,
+                                              highways,
+                                              categories){
   # add totals
   confusion_matrix$Total <- rowSums(confusion_matrix)
   confusion_matrix[nrow(confusion_matrix) + 1, ] <- colSums(confusion_matrix)
@@ -872,40 +826,31 @@ Can_BICS_confusion_matrix_display_v2 <- function(confusion_matrix,
   return(confusion_matrix_display)
 }
 
-Can_BICS_accuracy_assessment_presence_absense <- function(reference,
-                                                          predicted){
-  # convert to factors with the same order
-  reference.levels = factor(reference,
-                            levels = presence_levels) %>%
-    recode_presence_absense()
+Can_BICS_accuracy_assessment_by_city <- function(reference,
+                                                 predicted,
+                                                 common_levels,
+                                                 CSDNAME,
+                                                 selected_CSDNAME){
+  city <- which(CSDNAME %in% selected_CSDNAME)
   
-  predicted.levels = factor(predicted, 
-                            levels = presence_levels) %>%
-    recode_presence_absense()
-  
-  confusion_matrix <- confusionMatrix(predicted.levels,
-                                      reference.levels)
+  confusion_matrix <- Can_BICS_accuracy_assessment(
+    reference[city],
+    predicted[city],
+    common_levels
+  )
   
   return(confusion_matrix)
 }
 
-recode_comfort <- function(infra){
-  infra %>% Can_BICS_class
-}
-
-Can_BICS_accuracy_assessment_comfort <- function(reference,
-                                                 predicted){
-  # convert to factors with the same order
-  reference.levels = factor(reference,
-                            levels = infra_comfort_levels)
-  
-  predicted.levels = factor(predicted, 
-                            levels = infra_comfort_levels)
-  
-  confusion_matrix <- confusionMatrix(predicted.levels,
-                                      reference.levels)
-  
-  return(confusion_matrix)
+Can_BICS_confusion_matrix_display_by_city <- function(confusion_matrix,
+                                              highways,
+                                              categories,
+                                              selected_CSDNAME){
+  highways_subset <- which(highways$CSDNAME %in% selected_CSDNAME)
+  confusion_matrix_display <- Can_BICS_confusion_matrix_display(
+    confusion_matrix,
+    highways[highways_subset, ],
+    categories[highways_subset])
 }
 
 ################################################################################
@@ -1030,80 +975,6 @@ error_matrix_area_by_city <- function(ground_data,
   confusion_matrix_area <- area_error_matrix(confusion_matrix_calc)
   
   return(confusion_matrix_area)
-}
-
-error_matrix_area_by_city_od <- function(ground_data, 
-                                         sample_frame, 
-                                         CSDNAME_select){
-  
-  confusion_matrix_calc <- error_matrix_by_city_od(ground_data,
-                                                   CSDNAME_select)
-  
-  # from sample frame, get the proportion of each class
-  sample_frame$length <- st_length(sample_frame) %>% as.numeric()
-  
-  sample_frame_by_infratype <- sample_frame %>%
-    filter(CSDNAME %in% CSDNAME_select) %>%
-    st_drop_geometry()
-  
-  prediction <- sample_frame_by_infratype %>%
-    group_by(Can_BICS_recode) %>%
-    filter(!Can_BICS_recode %in% "blank") %>%
-    #st_drop_geometry() %>%
-    summarise(`length (km)` = sum(length) %>% round(0)) %>%
-    mutate(proportion = (`length (km)` / sum(`length (km)`)))
-  
-  length_calc <- prediction$`length (km)`
-  names(length_calc) <- prediction$Can_BICS_recode
-  length_calc[length(length_calc) + 1] <- sum(length_calc)
-  names(length_calc)[length(length_calc)] <- "Total"
-  length_calc <- fill_in_zeros(length_calc, names(confusion_matrix_calc))
-  length_calc <- length_calc[names(confusion_matrix_calc)]
-  
-  weights_calc <- prediction$proportion
-  names(weights_calc) <- prediction$Can_BICS_recode
-  weights_calc[length(weights_calc) + 1] <- sum(weights_calc)
-  names(weights_calc)[length(weights_calc)] <- "Total"
-  weights_calc <- fill_in_zeros(weights_calc, names(confusion_matrix_calc))
-  weights_calc <- weights_calc[names(confusion_matrix_calc)]
-  
-  confusion_matrix_calc$Length <- length_calc
-  confusion_matrix_calc$Proportion <- weights_calc  
-  confusion_matrix_area <- area_error_matrix(confusion_matrix_calc)
-  
-  return(confusion_matrix_area)
-}
-
-error_matrix_by_city <- function(ground_data, 
-                                 CSDNAME_select){
-  
-  city <- which(ground_data$CSDNAME %in% CSDNAME_select)
-  
-  accuracy_assessment <- Can_BICS_accuracy_assessment(
-    ground_data[city,]$Can_BICS_ground_recode,
-    ground_data[city,]$Can_BICS_recode
-  )
-  
-  confusion_matrix <- Can_BICS_confusion_matrix(accuracy_assessment)
-  return(confusion_matrix)
-}
-
-error_matrix_by_city_od <- function(ground_data, 
-                                    CSDNAME_select){
-  
-  city <- which(ground_data$CSDNAME %in% CSDNAME_select)
-  
-  stratum_recode <- ground_data %>%
-    mutate(Can_BICS = recode(Can_BICS_stratum,
-                             "OSM Only" = "Non-Conforming"))
-  
-  accuracy_assessment_od <- Can_BICS_accuracy_assessment(
-    ground_data[city,]$Can_BICS_ground_recode,
-    stratum_recode[city,]$Can_BICS
-  )
-  
-  confusion_matrix <- Can_BICS_confusion_matrix(accuracy_assessment_od)
-  return(confusion_matrix)
 }
 
 fill_in_zeros <- function(weights, names){
@@ -1259,17 +1130,32 @@ users_accuracy_ci <- function(confusion_matrix,
   return(users_accuracy_ci_calc)
 }
 
-add_city_to_accuracy_table <- function(size,
+add_city_to_accuracy_table <- function(accuracy_table,
+                                       size,
+                                       selected_CSDNAME,
+                                       reference,
+                                       predicted,
+                                       levels,
                                        CSDNAME,
-                                       highways,
-                                       reference_data,
-                                       accuracy_table){
-  em <- error_matrix_by_city(reference_data,
-                             CSDNAME)
+                                       highways){
   
-  em_area <- error_matrix_area_by_city(reference_data,
-                                       highways,
-                                       CSDNAME)
+  em <- Can_BICS_accuracy_assessment_by_city(
+    reference,
+    predicted,
+    levels,
+    CSDNAME,
+    selected_CSDNAME)
+  
+  em_display <- Can_BICS_confusion_matrix_display_by_city(
+    confusion_matrix = em,
+    highways = highways,
+    categories = highways$Can_BICS_recode,
+    selected_CSDNAME
+  )
+  
+  em_area <- error_matrix_area(reference,
+                               highways,
+                               selected_CSDNAME)
   
   accuracy_table[nrow(accuracy_table)+1, ] <- c(size,
                                                 CSDNAME,
@@ -1280,27 +1166,6 @@ add_city_to_accuracy_table <- function(size,
   return(accuracy_table)
 }
 
-add_city_to_accuracy_table_od <- function(size,
-                                          CSDNAME,
-                                          sample_frame,
-                                          reference_data,
-                                          accuracy_table_od){
-  
-  em <- error_matrix_by_city_od(reference_data,
-                                CSDNAME)
-  
-  em_area <- error_matrix_area_by_city_od(reference_data,
-                                          sample_frame,
-                                          CSDNAME)
-  
-  accuracy_table_od[nrow(accuracy_table_od)+1, ] <- c(size,
-                                                      CSDNAME,
-                                                      em$Total[nrow(em)],
-                                                      overall_accuracy(em_area),
-                                                      overall_accuracy_ci(em,
-                                                                          em_area))
-  return(accuracy_table_od)
-}
 
 ####################################################################### classify
 unmatched <- function(osm_dataframe){
@@ -1330,7 +1195,9 @@ classify_highways <- function(highways,
     st_intersection(CSDS)
   
   highways_predicted <- highways_csds %>% 
-    important_tags(c("CSDNAME", "PRNAME",
+    important_tags(c("CSDNAME", 
+                     "CSDUID",
+                     "PRNAME",
                      desired_osm_columns))
   
   highways_predicted$road_or_path <- road_or_path(highways_predicted)
@@ -1504,6 +1371,37 @@ get_lengths_proportions <- function(features,
   names(prediction_infratype) <- c("Category",
                                    "Length",
                                    "Proportion")
+  
+  return(prediction_infratype)
+}
+
+get_lengths_proportions_groups <- function(features,
+                                           categories,
+                                           groups){
+  
+  # get the proportion of each class
+  features$length <- st_length(features) %>% as.numeric() / 1000
+  features$category <- categories
+  features$group <- groups
+  
+  prediction_infratype <- features %>%
+    st_drop_geometry() %>%
+    filter(! is.na(categories))
+  
+  prediction_infratype <- prediction_infratype %>%
+    group_by(group, category) %>%
+    summarise(
+      length = sum(length) %>% 
+        round(1) %>%
+        as.numeric()) %>%
+    mutate(proportion = round((length / sum(length)), 6) %>%
+             as.numeric())
+  
+  names(prediction_infratype) <- c(
+    "Group",
+    "Category",
+    "Length",
+    "Proportion")
   
   return(prediction_infratype)
 }
