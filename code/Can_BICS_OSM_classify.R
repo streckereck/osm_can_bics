@@ -1,9 +1,5 @@
 # Functions to classify OSM Can-BICS infrastructure type
-# each section needs to be run sequentially
-
-library(knitr)
 library(lwgeom)
-library(mapview)
 library(raster)
 library(sf)
 library(tidyverse)
@@ -18,11 +14,7 @@ bikes_suggested <- function(osm_dataframe){
 }
 
 bikes_restricted <- function(osm_dataframe){
-  osm_dataframe$bicycle %in% c("no", "restricted", "dismount") 
-    #osm_dataframe$cycleway %in% c("no") | # sometimes this is used for no cycletrack
-    # osm_dataframe$cycleway.left %in% c("no") |
-    # osm_dataframe$cycleway.right %in% c("no") |
-    # osm_dataframe$cycleway.both %in% c("no")
+  osm_dataframe$bicycle %in% c("no", "restricted", "dismount")
 }
 
 cycle_network <- function(osm_dataframe){
@@ -56,13 +48,10 @@ path <- function(osm_dataframe){
                                "footway",
                                "track",
                                "raceway",
-                               "service", # no alleyways, unless they are part of a designated bike route, like the seawall
+                               "service",
                                "crossing",
                                "sidewalk")
 }
-
-# non-conforming trail: highway = pedestrian | sidewalks where bikes are allowed
-# non-conforming trail: highway = footway in many cases; review training data these are often too narrow.
 
 #3. Surface
 paved <- function(osm_dataframe){
@@ -99,23 +88,18 @@ non_conforming_trail_attributes <- function(osm_dataframe){
     osm_dataframe$highway %in% "service" & !cycle_network(osm_dataframe) 
 }
 
-# testing 
-# table(training$Can_BICS_ground, hike_mtb_indicated(training))
-# View(training %>% filter(hike_mtb_indicated(training)))
-
 # if surface is missing, check landcover
 # source: https://open.canada.ca/data/en/dataset/4e615eae-b90c-420b-adee-2ca35896caf6
 # https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip
 
 # from metadata: EPSG:3978 - NAD83 / Canada Atlas Lambert - Projected
-crs(landcover) <- st_crs(3978)$wkt
 non_urban <- c(1, 2, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 18, 19) 
 
 
-# uses a loop to check extract landcover for each feature
+# uses a (slow) loop to check extract landcover for each feature
+# potential for improvement here if there is a more efficient method
 
 # assumes there is a landcover raster called "landcover"
-# assumes that there is a dataframe of all osm highways called "highways_all"
 urban_landcover <- function(osm_dataframe){
   urban_result <- rep(NA, nrow(osm_dataframe))
   
@@ -125,11 +109,9 @@ urban_landcover <- function(osm_dataframe){
   
   print(paste0("checking ", length(paths_check), " features."))
   
-  debug <- F
-  
-  if(debug){
-    View(osm_dataframe[paths_check, ])
-  } 
+  # if(debug){
+  #   View(osm_dataframe[paths_check, ])
+  # } 
   
   if(length(paths_check) > 0){
     for(i in 1:length(paths_check)){
@@ -140,32 +122,23 @@ urban_landcover <- function(osm_dataframe){
       feature_index <- paths_check[i]
       selected_feature <- osm_dataframe[feature_index,]
       
-      if("POINT" %in% st_geometry_type(selected_feature)){
-        osm_id <- selected_feature$nn_osm_id
-      } else {
-        osm_id <- selected_feature$osm_id
-      }
-      
-      # testing:: osm_id <- 116896366
-      
+      osm_id <- selected_feature$osm_id
+
       selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
                                                 osm_id), ]
       
-      # if there is no match - delete
+      # check for match
       if(nrow(selected_highway) == 0){
         print(paste0("no matching OSM feature for osm_id: ", osm_id))
       } else if (cycle_network(selected_highway)) {
-        # special exception for the stanley park causeway
         print("bike route. assuming paved.")
         urban_result[feature_index] <- T
-        
       } else {
-        
         print(selected_highway$name)
         
-        if(debug){
-          mapview(selected_highway)
-        }
+        # if(debug){
+        #   mapview(selected_highway)
+        # }
         
         if(is.na(selected_highway$surface)){
           # check if located in an urban area
@@ -247,7 +220,6 @@ multi_use <- function(osm_dataframe){
   foot_indicated(osm_dataframe) &
     ! foot_restricted(osm_dataframe) &
     ! osm_dataframe$segregated %in% "yes" 
-  # osm_dataframe$segregated %in% "no" # segregated = no is not enough evidence
 }
 
 ###############################################################################
@@ -264,11 +236,11 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
   
   debug <- F
   
-  if(debug){
-    View(osm_dataframe[tracks, ])
-  } 
+  # if(debug){
+  #   View(osm_dataframe[tracks, ])
+  # } 
   
-  # first, MUPs based on attributes only - fast!
+  # first, MUPs based on attributes only
   mups <- which(osm_dataframe$road_or_path %in% "Path" &
                   multi_use(osm_dataframe))
   
@@ -281,10 +253,7 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
   # there is one other case for MUPS: bike paths with no ped
   # restrictions: addressed below
   
-  # now on to cycletracks and bike paths
-  
-  # test: i <- which(osm_dataframe[tracks, ]$osm_id %in% 511798517)
-  
+  # cycletracks and bike paths
   if(length(tracks) == 0){
     return(bike_paths_test)
   }
@@ -296,14 +265,8 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
     feature_index <- tracks[i]
     selected_feature <- osm_dataframe[feature_index,]
     
-    if("POINT" %in% st_geometry_type(selected_feature)){
-      osm_id <- selected_feature$nn_osm_id
-    } else {
-      osm_id <- selected_feature$osm_id
-    }
-    
-    # testing:: osm_id <- 396976359
-    
+    osm_id <- selected_feature$osm_id
+
     selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
                                               osm_id), ]
     
@@ -311,14 +274,13 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
     
     print(selected_highway$name)
     
-    if(debug){
-      mapview(selected_highway)
-    }
+    # if(debug){
+    #   mapview(selected_highway)
+    # }
     
     search_dist <- 15
     
     # search for highways within 10 m
-    
     segments_search_dist <- osm_dataframe %>%
       st_intersection(st_buffer(selected_highway, search_dist)) %>%
       filter(! osm_id %in% selected_highway$osm_id)
@@ -326,9 +288,9 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
     segments_search_dist$length <- st_length(segments_search_dist) %>%
       as.numeric()
     
-    if(debug){
-      mapview(segments_search_dist["length"])
-    }
+    # if(debug){
+    #   mapview(segments_search_dist["length"])
+    # }
     
     # select roads
     road_types <- c(
@@ -356,14 +318,13 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
         "pedestrian",
         "sidewalk")) 
     
-    
     # find parallel streets - at least 40 m, and at least 30% of total length
     if(nrow(segments_search_dist_roads) > 0){      
       parallel <- which(segments_search_dist_roads$length > 40)
       parallel_roads <- segments_search_dist_roads[parallel, ]
-      if(debug){
-        mapview(parallel_roads["length"])
-      }
+      # if(debug){
+      #   mapview(parallel_roads["length"])
+      # }
       
       parallel_road <- nrow(parallel_roads) > 0
       
@@ -371,11 +332,11 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
       if(sum(parallel_roads$length) < (0.3 * selected_highway$length)){
         parallel_road <- F
       } 
+      
       # the other case is that a short segment is surrounded by roads
       if(sum(segments_search_dist_roads$length) > 4 * selected_highway$length){
         parallel_road <- T
       }
-      
       
     } else {
       parallel_road <- F
@@ -385,14 +346,13 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
     if(nrow(segments_search_dist_footways) > 0){
       parallel <- which(segments_search_dist_footways$length > 40)
       parallel_footways <- segments_search_dist_footways[parallel, ]
-      if(debug){
-        #mapview(parallel_footways["length"])
-      }
+      # if(debug){
+      #   #mapview(parallel_footways["length"])
+      # }
       parallel_footway <- nrow(parallel_footways) > 0
     } else {
       parallel_footway <- F
     }
-    
     
     if(! parallel_road){
       # burden of proof: must actually say that pedestrians are restricted or 
@@ -468,6 +428,7 @@ speed_limited <- function(osm_dataframe){
 
 speed_not_limited <- function(osm_dataframe){
   osm_dataframe$maxspeed %in% c(
+    "40", "45",
     "50", "55", "60", "65",
     "70", "75", "80", "85",
     "90", "95", "100", "105",
@@ -480,8 +441,6 @@ local_street <- function(osm_dataframe){
   (minor_road(osm_dataframe) & ! speed_not_limited(osm_dataframe) &
      ! unpaved(osm_dataframe))
 }
-
-
 
 # road characteristics
 traffic_calming_attributes <- function(osm_dataframe){
@@ -517,8 +476,7 @@ local_street_bikeway_attributes <- function(osm_dataframe){
 
 
 ###############################################################################
-# geometry check for lsbs
-
+# geometry check for local street bikeways
 # assumes that paths have been classified
 
 local_street_bikeway_geometry <- function(osm_dataframe){
@@ -530,9 +488,9 @@ local_street_bikeway_geometry <- function(osm_dataframe){
   
   debug <- F
   
-  if(debug){
-    View(osm_dataframe[lsbs, ])
-  }  
+  # if(debug){
+  #   View(osm_dataframe[lsbs, ])
+  # }  
   
   if(length(lsbs > 0)){
     for(i in 1:length(lsbs)){
@@ -543,27 +501,23 @@ local_street_bikeway_geometry <- function(osm_dataframe){
       feature_index <- lsbs[i]
       selected_feature <- osm_dataframe[feature_index,]
       
-      if("POINT" %in% st_geometry_type(selected_feature)){
-        osm_id <- selected_feature$nn_osm_id
-      } else {
-        osm_id <- selected_feature$osm_id
-      }
-      
+      osm_id <- selected_feature$osm_id
+
       selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
                                                 osm_id), ]
       
       # a single highway could be split into two or pieces, if crossing a 
       # census line. In that case, you only need one because they are identical,
-      # other than the CSD.
+      # (other than the census geometry)
       if(nrow(selected_highway) > 1){
         selected_highway <- selected_highway[-which(duplicated(selected_highway$osm_id)), ]
       }
       
       print(selected_highway$name)
       
-      if(debug){
-        mapview(selected_highway)
-      }
+      # if(debug){
+      #   mapview(selected_highway)
+      # }
       
       search_dist <- 750
       
@@ -616,7 +570,6 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         segments_same_national_cycle_network_name <- NULL
       }
       
-      
       segments_same_name <- rbind(segments_same_name,
                                   segments_same_local_cycle_network_name,
                                   segments_same_regional_cycle_network_name,
@@ -626,11 +579,11 @@ local_street_bikeway_geometry <- function(osm_dataframe){
       segments_same_name_search_dist <- segments_same_name %>%
         st_intersection(st_buffer(selected_highway, search_dist))
       
-      if(debug){
-        mapview(segments_same_name_search_dist)
-      }
+      # if(debug){
+      #   mapview(segments_same_name_search_dist)
+      # }
       
-      # first check for roundabouts - faster
+      # first check for roundabouts - fastest
       
       # select roundabouts that are touching
       touching_threshold <- 5 # if within 5 m
@@ -644,14 +597,14 @@ local_street_bikeway_geometry <- function(osm_dataframe){
                           st_buffer(touching_threshold))
       
       if(nrow(touching_roundabouts) > 0){
-        if(debug){
-          mapview(touching_roundabouts)
-        }
+        # if(debug){
+        #   mapview(touching_roundabouts)
+        # }
       }
-      if(debug){
-        mapview(rbind(touching_segments %>% dplyr::select(osm_id),
-                      touching_roundabouts %>% dplyr::select(osm_id)))
-      }
+      # if(debug){
+      #   mapview(rbind(touching_segments %>% dplyr::select(osm_id),
+      #                 touching_roundabouts %>% dplyr::select(osm_id)))
+      # }
       
       if(T %in% (touching_segments$junction %in%
                  "roundabout") |
@@ -666,10 +619,10 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         highways_extended <- osm_dataframe[which(osm_dataframe$osm_id %in% 
                                                    touching_segments$osm_id), ]
         
-        if(debug){
-          mapview(highways_extended["osm_id"])
-          
-        }
+        # if(debug){
+        #   mapview(highways_extended["osm_id"])
+        #   
+        # }
         
         start_points <- highways_extended %>%
           st_startpoint() %>%
@@ -680,9 +633,9 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         start_end_points <- rbind(start_points,
                                   end_points)
         
-        if(debug){
-          mapview(start_end_points)
-        }
+        # if(debug){
+        #   mapview(start_end_points)
+        # }
         
         # find endpoints that do not continue
         
@@ -693,17 +646,17 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         start_end_points_route <- start_end_points %>%
           st_intersection(st_buffer(segments_same_name_search_dist, touching_dist))
         
-        if(debug){
-          mapview(start_end_points_route["road_count"])
-        }
+        # if(debug){
+        #   mapview(start_end_points_route["road_count"])
+        # }
         
         if(length(which(start_end_points_route$road_count == 3)) > 0){
           deadends <- start_end_points_route %>%
             filter(road_count == 3)
           # find paths touching
-          if(debug){
-            mapview(deadends)
-          }
+          # if(debug){
+          #   mapview(deadends)
+          # }
           touching_threshold <- 5
           
           deadend_touching_path_track_segments <- osm_dataframe %>% 
@@ -713,9 +666,9 @@ local_street_bikeway_geometry <- function(osm_dataframe){
                                     "Multi-Use Path",
                                     "Bike Path"))
           if(nrow(deadend_touching_path_track_segments) >0) {
-            if(debug){
-              mapview(deadend_touching_path_track_segments)
-            }
+            # if(debug){
+            #   mapview(deadend_touching_path_track_segments)
+            # }
           }
           
           if(nrow(deadend_touching_path_track_segments) > 0){
