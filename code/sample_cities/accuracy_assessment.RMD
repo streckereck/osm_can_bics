@@ -1,0 +1,799 @@
+---
+title: "Accuracy assessment"
+author: "colin_ferster_2@sfu.ca"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(janitor)
+library(knitr)
+library(sf)
+library(tidyverse)
+
+source("../Can_BICS_OSM_functions.R")
+
+###################################################### 
+# load and recode all data consistently for comparison
+# recode as ordered factors
+# Datasets:
+#  ground data (testing and predicted)
+#  predicted highways
+#  sample frame
+# columns: 
+#  Can_BICS_recode, 
+#  Can_BICS_class_recode, 
+#  Can_BICS_presence_recode
+# values:
+#  infratype, comfort class, and presence/absence
+#  non-conforming
+#  na for none
+# defined in Can_BICS_functions.R
+
+# load reference data for all cities
+reference_predicted <- st_read("../../data/sample_cities/reference_predicted.gpkg",
+                                  stringsAsFactors = F) 
+
+recode_ground_data_predicted <- function(Can_BICS){
+    Can_BICS_recode = recode(Can_BICS,
+  "Cycle Track (on roadway)" = "Cycle Track",
+  "Non-Conforming Major Road" = "Non-Conforming",
+  "Non-Conforming Trail" = "Non-Conforming",
+  "Non-Conforming Other" = "Non-Conforming", 
+  "None" = "Non-Conforming") %>%
+      replace_na("Non-Conforming")
+  Can_BICS_recode <- factor(Can_BICS_recode,
+                            levels = infra_levels)
+  return(Can_BICS_recode)
+}
+
+recode_open_data <- function(Can_BICS){
+    Can_BICS_recode = recode(Can_BICS,
+                             "OSM Only" = "Non-Conforming") %>%
+      replace_na("Non-Conforming")
+  Can_BICS_recode <- factor(Can_BICS_recode,
+                            levels = infra_levels)
+  return(Can_BICS_recode)
+}
+
+recode_Can_BICS_class <- function(Can_BICS_class){
+  Can_BICS_class_recode <- Can_BICS_class(Can_BICS_class)
+  Can_BICS_class_recode <- factor(Can_BICS_class_recode,
+                            levels = infra_comfort_levels)
+  return(Can_BICS_class_recode)
+}
+
+recode_presence_absense <- function(Can_BICS_recode){
+  presence_absense_recode <- case_when(
+    is.na(Can_BICS_recode) ~ "NA",
+    Can_BICS_recode %in% "Non-Conforming" ~ "Non-Conforming",
+                                              T ~ "Can-BICS")
+  presence_absense_recode <- factor(presence_absense_recode,
+                                    levels = presence_levels)
+  return(presence_absense_recode)
+}
+
+reference_predicted <- reference_predicted %>%
+  mutate(Can_BICS_recode = recode_ground_data_predicted(Can_BICS),
+         
+         Can_BICS_ground_recode = recode_ground_data_predicted(Can_BICS_ground),
+         
+         Can_BICS_open_data_recode = recode_open_data(Can_BICS_stratum),
+         
+         Can_BICS_class_recode = recode_Can_BICS_class(Can_BICS_recode),
+         
+         Can_BICS_ground_class_recode = recode_Can_BICS_class(Can_BICS_ground_recode),
+         
+         Can_BICS_open_data_class_recode = recode_Can_BICS_class(Can_BICS_open_data_recode),
+         
+         presenense_absense_recode = recode_presence_absense(Can_BICS_recode),
+         
+         presenense_absense_ground_recode = recode_presence_absense(Can_BICS_ground_recode),
+         
+         presenense_absense_open_data_recode = recode_presence_absense(Can_BICS_open_data_recode),
+         
+         match_Can_BICS = Can_BICS_recode == Can_BICS_ground_recode,
+         
+         match_Can_BICS_class = Can_BICS_class_recode == Can_BICS_ground_class_recode,
+         
+         match_presence_absence = presenense_absense_recode == presenense_absense_ground_recode,
+         
+         match_Can_BICS_open_data = Can_BICS_recode == Can_BICS_open_data_recode,
+         
+         match_Can_BICS_class_open_data = Can_BICS_class_recode == Can_BICS_open_data_class_recode,
+         
+         match_presence_absence_open_data = presenense_absense_recode == presenense_absense_open_data_recode
+         )
+
+
+# counts and descriptives
+training_size <- nrow(reference_predicted %>% filter(type == "Training"))
+testing_size <- nrow(reference_predicted %>% filter(type == "Testing"))
+
+sample_size <- training_size +
+  testing_size
+
+reviewed <- nrow(reference_predicted %>% filter(reviewed))
+
+# load sample frame
+sample_frame <- st_read("../../data/sample_cities/sample_frame.gpkg")
+
+# consistent coding
+sample_frame <- sample_frame %>% 
+  mutate(Can_BICS_recode = recode(Can_BICS,
+                                  "OSM Only" = "Non-Conforming",
+                                  "blank" = "Non-Conforming"),
+         Can_BICS_class_recode = recode_Can_BICS_class(Can_BICS_recode),
+         presence_absense_recode = recode_presence_absense(Can_BICS_recode),
+         length = st_length(sample_frame) %>% as.numeric() / 1000)
+
+# from sample frame, get the proportion of each class
+sample_frame_by_infratype <- sample_frame %>%
+  st_drop_geometry() %>%
+  group_by(Can_BICS_recode) %>%
+  filter(!Can_BICS_recode %in% "blank") %>%
+  summarise(`length (km)` = sum(length) %>% round(0)) %>%
+  mutate(`length (%)` = round(100 * `length (km)` / sum(`length (km)`), 0))
+
+# from the reference data (points), get the counts and proportions by infra type.
+
+reference_predicted_by_infratype <- reference_predicted %>%
+  group_by(Can_BICS_stratum) %>%
+  st_drop_geometry() %>%
+  summarise(`samples (n)` = n()) %>%
+  mutate(`samples (%)` = round(100 * `samples (n)` / sum(`samples (n)`), 0))
+
+# combine into a table, add totals
+sampling <- tibble(`Infrastructure type` = 
+                         reference_predicted_by_infratype$Can_BICS_stratum,
+                       `length (km)` = sample_frame_by_infratype$`length (km)`,
+                       `length (%)` = sample_frame_by_infratype$`length (%)`,
+                       `samples (n)` = reference_predicted_by_infratype$`samples (n)`,
+                       `samples (%)` = reference_predicted_by_infratype$`samples (%)`) %>%
+  adorn_totals("row")
+
+highways_predict <- st_read("../../data/sample_cities/highways_all_predicted.gpkg",
+                            stringsAsFactors = F)
+
+highways_predict <- highways_predict %>%
+  mutate(Can_BICS_recode = case_when(
+    Can_BICS %in% "None" ~ "NA",
+    Can_BICS %in% "Cycle Track (on roadway)" ~ "Cycle Track",
+    Can_BICS %in% "Non-Conforming Major Road" ~ "Non-Conforming",
+    Can_BICS %in% "Non-Conforming Trail" ~ "Non-Conforming",
+    Can_BICS %in% "Non-Conforming Other" ~ "Non-Conforming",
+    T ~ as.character(Can_BICS))) %>% 
+    mutate(
+      Can_BICS_recode = na_if(Can_BICS_recode, "NA"),
+      Can_BICS_class_recode = recode_Can_BICS_class(Can_BICS_recode),
+      presence_absence_recode = recode_presence_absense(Can_BICS_recode))
+
+# from prediction, get the proportion of each class
+prediction_infratype <- get_lengths_proportions(highways_predict,
+  highways_predict$Can_BICS_recode)
+
+################################################################################
+non_conforming <- c(
+  "Non-Conforming",
+  "Non-conforming major road",
+                                     "Non-conforming other",
+                                     "Non-conforming trail",
+                    "Non-Conforming Major Road",
+                                     "Non-Conforming Other",
+                                     "Non-Conforming Trail",
+                    "Non-standard major road",
+                    "Non-standard other",
+                    "Non-standard trail",
+                    NA,
+                    "None",
+                    "Substandard")
+
+highways_predict$length <- highways_predict %>%
+  st_length() %>%
+  as.numeric() / 1000
+
+# how many mups are missing surface?
+mups_missing_surface <- reference_predicted %>% 
+  filter(Can_BICS_ground_recode %in% "Multi-Use Path") %>%
+  st_drop_geometry() %>%
+  group_by(surface) %>%
+  summarise(n = n()) %>%
+  mutate(perc = n/sum(n))
+```
+
+## Sample design
+Following Olofsson et al. 2013.
+
+Olofsson, P., Foody, G. M., Stehman, S. V., & Woodcock, C. E. (2013). Making better use of accuracy data in land change studies: Estimating accuracy and area and quantifying uncertainty using stratified estimation. Remote Sensing of Environment, 129, 122–131. https://doi.org/10.1016/j.rse.2012.10.031
+
+### Clear description of the sample design.
+* sample size n = `r sample_size`.
+  * training n = `r training_size` (`r round(training_size/sample_size, 2) * 100`%).
+  * testing n = `r testing_size` (`r round(testing_size/sample_size, 2) * 100`%).
+* reviewed n = `r reviewed` (`r round(reviewed/sample_size, 2) * 100`%)
+* not reviewed = `r sample_size - reviewed` (`r round((sample_size - reviewed)/sample_size, 2) * 100`%)
+
+#### Details of the stratification
+
+* 15 cities were selected across Canada:
+  * 5 large (pop'n > 500 K).
+  * 5 medium (pop'n 50 - 500 K).
+  * 5 small (pop'n < 50 K).
+  * open data available for bike infrastructure.
+* The sample frame included:
+  * Roads and trails with bike infrastructure from open data.
+  * Roads and trails with any indication of bike infrastructure from OSM not 
+  included in open data (within a 20 m buffer).
+* Street segments were divided into 50 m lengths
+* Random samples were collected at the midpoint of the lengths at the following 
+rates:
+  * 1 sample per 10 km of low and medium comfort infrastructure (painted bike 
+  lanes and multi-use trails, which are common).
+  * 2 samples per km of high comfort infrastructure (since it is rare and 
+  important).
+  * 2 samples per km of locations that are in OSM that are missing from open 
+  data (to provide greater scrutiny).
+* length of the sample frame = `r sum(st_length(sample_frame)) / 1000`
+```{r, echo = F}
+
+kable(sampling,
+      caption = "Sample frame.")
+```
+
+## Error matrix and descriptive accuracy measures
+
+**Definitions for the accuracy assessment:**
+
+
+* Weight: The proportion of a facility type on the classified map.
+* User's accuracy: The accuracy from the perspective of a map user. The 
+probability that a member of a class on the map actually belongs to that class. 
+Relates to commission error.
+* Producer's accuracy: The accuracy from the perspective of a map creator. The 
+probability that a reference measurement is classified in the correct class.
+ Relates to omission error.
+* Overall accuracy: The overall proportion of reference measurements that are 
+classified in the correct class.
+* Post-stratification accuracy: Accuracy statistics that are proportionally 
+weighted by length on the classified map.
+
+
+```{r, echo = F}
+# by type
+ground_data_testing_predicted <- reference_predicted %>% 
+  filter(type %in% "Testing")
+
+confusion_matrix <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$Can_BICS_ground_recode,
+  ground_data_testing_predicted$Can_BICS_recode,
+  infra_levels)
+
+confusion_matrix_display <- Can_BICS_confusion_matrix_display(confusion_matrix,
+  highways_predict,
+  highways_predict$Can_BICS_recode)
+
+kable(confusion_matrix_display,
+      caption = "Table 1. Classification error matrix for OSM Can-BICS classification using the test data. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area <- area_error_matrix(confusion_matrix_display)
+
+confusion_matrix_area_display <- error_matrix_area_display(confusion_matrix, confusion_matrix_area)
+
+kable(confusion_matrix_area_display,
+      caption = "Table 2. Error matrix for facility type by proportion of total length.",
+      digits = 2)
+```
+
+OSM compared to open data
+```{r, echo = F, include = T}
+
+# open data accuracy
+# infra type
+
+# don't think it's needed..
+# stratum_recode <- ground_data_testing_predicted %>%
+#     mutate(Can_BICS = recode(Can_BICS_stratum,
+#                              "OSM Only" = "Non-Conforming"),
+#            Can_BICS_class = Can_BICS_class(Can_BICS),
+#            Can_BICS_presence_absense = recode_presence_absense(Can_BICS))
+
+confusion_matrix_od <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$Can_BICS_ground_recode,
+  ground_data_testing_predicted$Can_BICS_open_data_recode,
+  infra_levels)
+
+confusion_matrix_display_od <- Can_BICS_confusion_matrix_display(confusion_matrix_od,
+  sample_frame,
+  sample_frame$Can_BICS_recode)
+
+kable(confusion_matrix_display_od,
+      caption = "Table 3. Classification matrix for open data. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area_od <- area_error_matrix(confusion_matrix_display_od)
+
+confusion_matrix_area_display_od <- error_matrix_area_display(confusion_matrix_od, confusion_matrix_area_od)
+
+kable(confusion_matrix_area_display_od,
+      caption = "Table 4. Error matrix by proportion of total length for open data.",
+      digits = 2)
+```
+
+```{r, echo = F}
+# accuracy by class
+confusion_matrix_class <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$Can_BICS_ground_class_recode,
+  ground_data_testing_predicted$Can_BICS_class_recode,
+  infra_comfort_levels)
+
+confusion_matrix_display_class <- Can_BICS_confusion_matrix_display(confusion_matrix_class,
+  highways_predict,
+  highways_predict$Can_BICS_class_recode)
+
+kable(confusion_matrix_display_class,
+      caption = "Table 5. Classification matrix for classification of OSM Can-BICS class. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area_class <- area_error_matrix(confusion_matrix_display_class)
+
+confusion_matrix_area_display_class <- error_matrix_area_display(confusion_matrix_class, confusion_matrix_area_class)
+
+kable(confusion_matrix_area_display_class,
+      caption = "Table 6. Error matrix by proportion of total length by class.",
+      digits = 2)
+
+```
+
+```{r, echo = F}
+# open data
+# accuracy by class
+confusion_matrix_od_class <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$Can_BICS_ground_class_recode,
+  ground_data_testing_predicted$Can_BICS_open_data_class_recode,
+  infra_comfort_levels)
+
+confusion_matrix_display_od_class <- Can_BICS_confusion_matrix_display(
+  confusion_matrix_od_class,
+  sample_frame,
+  sample_frame$Can_BICS_class_recode)
+
+kable(confusion_matrix_display_od,
+      caption = "Table 3. Classification matrix for open data comfort class. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area_od_class <- area_error_matrix(confusion_matrix_display_od_class)
+
+confusion_matrix_area_display_od_class <- error_matrix_area_display(confusion_matrix_od_class, 
+                                                              confusion_matrix_area_od_class)
+
+kable(confusion_matrix_area_display_od_class,
+      caption = "Table 4. Error matrix by proportion of total length for open data class.",
+      digits = 2)
+
+
+```
+
+```{r, echo = F}
+# accuracy presence/absence
+
+confusion_matrix_pa <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$presenense_absense_ground_recode,
+  ground_data_testing_predicted$presenense_absense_recode,
+  presence_levels)
+
+confusion_matrix_display_pa <- Can_BICS_confusion_matrix_display(confusion_matrix_pa,
+  highways_predict,
+  highways_predict$presence_absence_recode)
+
+kable(confusion_matrix_display_pa,
+      caption = "Table 7. Classification matrix for presence absence. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area_pa <- area_error_matrix(confusion_matrix_display_pa)
+
+confusion_matrix_area_display_pa <- error_matrix_area_display(confusion_matrix_pa, confusion_matrix_area_pa)
+
+kable(confusion_matrix_area_display_pa,
+      caption = "Table 8. Error matrix by proportion of total length by class.",
+      digits = 2)
+
+```
+
+```{r, echo = F}
+# open data
+# accuracy by presence, absence
+confusion_matrix_od_presence <- Can_BICS_accuracy_assessment(
+  ground_data_testing_predicted$presenense_absense_ground_recode,
+  ground_data_testing_predicted$presenense_absense_open_data_recode,
+  presence_levels)
+
+confusion_matrix_display_od_presence <- Can_BICS_confusion_matrix_display(
+  confusion_matrix_od_presence,
+  sample_frame,
+  sample_frame$presence_absense_recode)
+
+kable(confusion_matrix_display_od_presence,
+      caption = "Table 3. Classification matrix for open data presence. Reference counts are in columns and classification counts are in rows.")
+
+confusion_matrix_area_od_presence <- area_error_matrix(confusion_matrix_display_od_presence)
+
+confusion_matrix_area_display_od_presence <- error_matrix_area_display(confusion_matrix_od_presence, 
+                                                              confusion_matrix_area_od_presence)
+
+kable(confusion_matrix_area_display_od_presence,
+      caption = "Table 4. Error matrix by proportion of total length for open data presence.",
+      digits = 2)
+
+
+```
+
+Note: the by-city analysis combined all CSDs in the Island of Montreal.
+That wasn't right. Back to Montreal CSD alone.
+
+```{r, echo = F, include = F}
+
+# # identify csds in montreal
+montreal_island_csds <- c("CÃ´te-Saint-Luc",
+                          "Hampstead",
+                          "Mont-Royal",
+                          "MontrÃ©al-Est",
+                          "MontrÃ©al",
+                          "Westmount",
+                          "Beaconsfield",
+                          "Baie-D'UrfÃ©",
+                          "Sainte-Anne-de-Bellevue",
+                          "Senneville",
+                          "Dollard-Des Ormeaux",
+                          "Dorval",
+                          "Pointe-Claire",
+                          "Kirkland",
+                          "MontrÃ©al-Ouest")
+
+montreal_island_highways <- which(highways_predict$CSDNAME %in% 
+                                    montreal_island_csds)
+
+montreal_csd <- c("MontrÃ©al")
+
+montreal_island_highways_outside_csd <- which(highways_predict$CSDNAME %in% 
+                                    montreal_island_csds &
+                                    ! (highways_predict$CSDNAME %in% 
+                                    montreal_csd))
+
+montreal_csd_highways <- which((highways_predict$CSDNAME %in% 
+                                    montreal_csd))
+
+highways_predict[montreal_csd_highways,]$CSDNAME <- "Montréal" # clean up characters
+highways_predict <- highways_predict[-montreal_island_highways_outside_csd, ]
+
+```
+
+## Map lengths, proportions, and bias-adjusted estimates
+``` {r, echo = F}
+mapped_adjusted_lengths <- function(error_matrix_display,
+                                    error_matrix_area){
+  n_cats <- nrow(error_matrix_display) 
+  
+  lengths <- data.frame(Category = character(n_cats),
+                        Mapped_Length = numeric(n_cats),
+                        Adjusted_Length = numeric(n_cats),
+                        Bias = numeric(n_cats))
+  
+  lengths$Category <- row.names(error_matrix_display)
+  lengths$Mapped_Length <- error_matrix_display["Total", ]$Length * 
+    error_matrix_area$Total
+  lengths$Adjusted_Length <- error_matrix_display["Total", ]$Length * 
+    error_matrix_area["Total", ] %>% unlist()
+  lengths$Bias <- lengths$Mapped_Length / lengths$Adjusted_Length
+  row.names(lengths) <- lengths$Category
+  
+  lengths <- lengths %>%
+    mutate(Mapped_Length = round(Mapped_Length, 0),
+           Adjusted_Length = round(Adjusted_Length, 0),
+           Bias = round(Bias, 1)) %>%
+    mutate(Perc_Mapped = 100 * Mapped_Length / lengths["Total","Mapped_Length"],
+           Perc_Adjusted = 100 * Adjusted_Length / lengths["Total","Adjusted_Length"],
+           Adjusted_Length_CI = Adjusted_Length_CI(error_matrix_display),
+           Adjusted_Length_CI_perc = 100 * Adjusted_Length_CI / lengths["Total","Adjusted_Length"]) %>%
+    mutate(Perc_Mapped = round(Perc_Mapped, 1),
+           Perc_Adjusted = round(Perc_Adjusted, 1),
+           Adjusted_Length_CI = round(Adjusted_Length_CI, 0),
+           Adjusted_Length_CI_perc = round(Adjusted_Length_CI_perc, 1)) 
+  
+lengths <- lengths %>%
+  mutate(Mapped_Length,
+         Perc_Mapped,
+         Adjusted_Length = paste0(Adjusted_Length, " ±", Adjusted_Length_CI),
+         Perc_Adjusted = paste0(Perc_Adjusted, " ±",
+                                Adjusted_Length_CI_perc),
+         Bias) %>%
+  select(
+    Category,
+    Mapped_Length,
+    Perc_Mapped,
+    Adjusted_Length,
+    Perc_Adjusted,
+    Bias)
+
+}
+
+Adjusted_Length_CI <- function(error_matrix_display){
+  n_cats <- nrow(error_matrix_display) - 1 # all categories except the total
+  SE_cat <- c(rep(0, n_cats), NA) # NA for the total
+  for(j in 1:n_cats){ 
+    for(i in 1:n_cats){
+      n_class <- error_matrix_display$Total[i]
+      df = n_class -1 
+      weight <- error_matrix_display$Proportion[i]
+      prop_in_class <- error_matrix_display[i,j]/
+        n_class
+      SE_cat[j] <- SE_cat[j] + 
+        weight^2 * ((prop_in_class/(1-prop_in_class))/df) 
+    }
+  }
+  SE_cat <- sqrt(SE_cat)
+  SE_cat_area <- SE_cat * error_matrix_display["Total", "Length"]
+  CI <- 1.96 * SE_cat_area
+  names(CI) <- row.names(error_matrix_display)
+  return(CI)
+}
+
+
+
+
+lengths <- mapped_adjusted_lengths(confusion_matrix_display,
+                                   confusion_matrix_area)
+ 
+# write_csv(lengths, "../../data/national/adjustment.csv")
+
+kable(lengths, caption = "by type")
+
+lengths_class <- mapped_adjusted_lengths(confusion_matrix_display_class,
+                                   confusion_matrix_area_class)
+kable(lengths_class, caption = "by class")
+
+```
+Figures showing the distribution of infrastructure accross cities.
+
+``` {r, echo = F, include = F}
+
+# 1. Get population and area from census
+library(cancensus)
+
+options(cancensus.api_key='CensusMapper_e0c23a6719376c837a4ae87e9e9227f2')
+options(cancensus.cache_path = 'C://working/cancensus')
+
+census_data <- get_census(dataset='CA16', regions=list(PR=c("60","61","59","48","47","46","62","35","24","10","13","12","11")), vectors=c("v_CA16_401","v_CA16_5792","v_CA16_5807"), labels="detailed", geo_format='sf', level='CSD') %>%
+  st_transform(target_projection)
+
+# first, make the name match the stats can shapefile
+census_data$short_name <- str_replace(census_data$name, " \\s*\\([^\\)]+\\)", "")
+
+# select important variables, shorten names
+census_data_rename <- census_data %>%
+  select(name = short_name,
+         CSDUID = GeoUID,
+         Dwellings,
+         Population = `v_CA16_401: Population, 2016`,
+         Area = `Area (sq km)`,
+         Commuters = `v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`,
+         Bike_Commuters = `v_CA16_5807: Bicycle`,
+         geometry)
+
+# combine the island of Montreal
+montreal_csds <- c(montreal_island_csds, "Montréal", "Côte-Saint-Luc", "Baie-D'Urfé")
+montreal_census <- which(grepl(paste0(montreal_csds, collapse = "|"), census_data$name) & census_data$PR_UID%in% 24 & !census_data$name %in% "L'Île-Dorval (V)") # must be in Quebec, and get rid of the Island of Dorval
+
+# sum measures for the island of montreal, remove old records
+montreal <- census_data[montreal_census, ] %>%
+  summarise(name = "Montréal",
+            CSDUID = "2466023") %>%
+  mutate(
+    Dwellings = sum(census_data_rename$Dwellings[montreal_census]),
+    Population = sum(census_data_rename$Population[montreal_census]),
+         Area = sum(census_data_rename$Area[montreal_census]),
+         Commuters = sum(census_data_rename$Commuters[montreal_census]),
+         Bike_Commuters = sum(census_data_rename$Bike_Commuters[montreal_census]))
+montreal <- montreal[ , names(census_data_rename)] # match the column order
+
+# don't use this! It was a misunderstanding
+census_data_combine <- census_data_rename[-montreal_census, ]
+census_data_combine <- rbind(census_data_combine,
+                                      montreal)
+
+census_data_rename$size <- base::cut(census_data_rename$Population,
+                                     breaks = c(-1, 50000, 500000, Inf),
+                                     labels = c("small", "medium", "large"))
+census_data_rename$Bicycle_Mode_Share <- round(100 * census_data_rename$Bike_Commuters /
+  census_data_rename$Commuters, 1)
+
+# summarize infrastructure by type and city
+prediction_infratype_city <- get_lengths_proportions_groups(
+  highways_predict,
+  highways_predict$Can_BICS_class_recode,
+  highways_predict$CSDUID)
+
+prediction_infratype_city <- prediction_infratype_city %>%
+  left_join(census_data_rename, by = c("Group" = "CSDUID"))
+
+prediction_infratype_city$Can_BICS_class <- prediction_infratype_city$Category %>% 
+  as.factor()
+
+# metrics
+prediction_infratype_city$km_per_100k <- (prediction_infratype_city$Length / (prediction_infratype_city$Population / 100000))
+
+prediction_infratype_city$km_per_km2 <- prediction_infratype_city$Length / (prediction_infratype_city$Area)
+
+# get the max for each group
+prediction_infratype_city <- prediction_infratype_city %>%
+  group_by(Can_BICS_class, size) %>%
+  mutate(max_group = km_per_100k == max(km_per_100k),
+         max_label = ifelse(max_group, 
+                            paste0(name, " (", round(km_per_100k, 0)," km/100k)"), 
+                            NA))
+
+# get the min for each group
+prediction_infratype_city <- prediction_infratype_city %>%
+  group_by(Can_BICS_class, size) %>%
+  mutate(min_group = km_per_100k == min(km_per_100k),
+         min_label = ifelse(min_group, 
+                            paste0(name, " (", round(km_per_100k, 0)," km/100k)"), 
+                            NA))
+````
+
+``` {r, echo = F, warning = F}
+# Box Plot
+
+Can_BICS_colours <- c(
+  "#9C9C9C", # none: grey
+  "#73B2FF", # low: blue
+  "#89CD66", # med: light green
+  "#267300") # high: dark green
+
+prediction_infratype_city %>%
+  ggplot( aes(x = size, 
+              y = log10(km_per_100k),#Proportion * 100, 
+              fill = fct_rev(Can_BICS_class))) +
+    geom_boxplot() +
+    scale_fill_manual(values = Can_BICS_colours) +
+    scale_y_continuous(limits = c(-1.9, 5.3)) +
+    # geom_jitter(color = "black",
+    #             size = 0.6,
+    #             alpha = 0.9,
+    #             height = 0.5) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size=11)
+    ) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    ggtitle("Bicycle facilities in sample cities") +
+    xlab("") +
+    ylab("log10(km / 100,000 population)") +
+    labs(fill = "Can-BICS Comfort Class") +
+    geom_text(aes(label = max_label),
+              na.rm = TRUE,
+              position = position_dodge(width = .76),
+              hjust = "left",
+              vjust = "middle",
+              size = 2.5) +
+      geom_text(aes(label = min_label),
+              na.rm = TRUE,
+              position = position_dodge(width = 0.76),
+              hjust = "right",
+              vjust = "middle",
+              size = 2.5) +
+  coord_flip() 
+ggsave("../../figures/boxplot_sample_cities.png")
+
+library(viridis)
+prediction_infratype_city %>%
+  ggplot( aes(x = fct_rev(Can_BICS_class), 
+              y = log10(km_per_100k),#Proportion * 100, 
+              fill = size)) +
+    geom_boxplot() +
+    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
+    scale_y_continuous(limits = c(-2, 5.3)) +
+    # geom_jitter(color = "black",
+    #             size = 0.6,
+    #             alpha = 0.9,
+    #             height = 0.5) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size=11)
+    ) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    ggtitle("Bicycle facilities in sample cities") +
+    xlab("") +
+    ylab("log10(km / 100,000 population)") +
+    labs(fill = "Can-BICS Comfort Class") +
+    geom_text(aes(label = max_label),
+              na.rm = TRUE,
+              position = position_dodge(width = .76),
+              hjust = "left",
+              vjust = "middle",
+              size = 2.5) +
+      geom_text(aes(label = min_label),
+              na.rm = TRUE,
+              position = position_dodge(width = 0.76),
+              hjust = "right",
+              vjust = "middle",
+              size = 2.5) +
+  coord_flip() 
+  ggsave("../../figures/boxplot_sample_cities_by_size.png")
+
+```
+
+``` {r, echo = F, warning = F}
+# Violin Plot
+prediction_infratype_city %>%
+  ggplot(aes(x=size, 
+             y=log10(km_per_100k), 
+             fill=fct_rev(Can_BICS_class))) +
+    geom_violin() +
+    scale_fill_manual(values = Can_BICS_colours) +
+    geom_jitter(color = "black",
+                size = 0.6,
+                alpha = 0.9,
+                height = 0.1) +
+  theme_minimal() +
+    theme(
+      plot.title = element_text(size=11)
+    ) +
+    ggtitle("Violin plot: Bicycle facilities in sample cities") +
+    xlab("") +
+    ylab("log10(km/100,000 population)") +
+    labs(fill = "Can-BICS Comfort Class") +
+  guides(fill = guide_legend(reverse = TRUE)) +
+  coord_flip()
+```
+
+``` {r, echo = F, warning = F}
+# Ridge Plot
+library(ggridges)
+prediction_infratype_city %>%
+  ggplot(aes(
+    y=fct_rev(Can_BICS_class), 
+    x=Proportion * 100, 
+    #x=km_per_100k,
+    #x=km_per_km2, 
+    fill=Can_BICS_class)) +
+  scale_fill_manual(values = rev(Can_BICS_colours)) +
+  geom_density_ridges(alpha = 0.6,
+                      scale = 3) +
+  theme_ridges() +
+  theme(axis.text.y=element_blank()) +
+  scale_x_continuous(limits = c(0, 100)) +
+  ylab("") + 
+  xlab("Percent (%)") +
+  labs(fill = "Can-BICS Comfort Class") +
+  facet_wrap(~fct_rev(size),
+             nrow = 3,
+             strip.position = "left")
+
+```
+Line chart
+```{r}
+# Libraries
+library(hrbrthemes)
+library(GGally)
+library(viridis)
+
+# Data set is provided by R natively
+data <- prediction_infratype_city %>% 
+  select(name, Can_BICS_class, size, km_per_100k) %>%
+  pivot_wider(
+    id_cols = c(name, size),
+    names_from = Can_BICS_class,
+    values_from = km_per_100k)
+
+# Plot
+ggparcoord(data,
+    columns = 3:6,
+    groupColumn = 2,
+    showPoints = TRUE, 
+    title = "Parallel Coordinate Plot for the Iris Data",
+    alphaLines = 0.3) + 
+  scale_color_viridis(discrete=TRUE) +
+  theme_ipsum()+
+  theme(
+    plot.title = element_text(size=10)
+  ) +
+  facet_wrap(~size,
+             nrow = 3,
+             scales = "free_y")
+
+```
