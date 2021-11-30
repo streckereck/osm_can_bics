@@ -9,7 +9,7 @@ labels.
 * [Introduction](#introduction)
 * [Technology](#technology)
 * [Test cities](#test-cities)
-* [National map](#national-map)
+* [National dataset](#national-dataset)
 
 ## Introduction
 OSM Can-BICS classifies [OpenStreetMap (OSM)](https://www.openstreetmap.org/) to 
