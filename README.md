@@ -22,8 +22,8 @@ of facilities across cities, and many studies do not provide a statement of
 accuracy. OpenStreetMap provides a more collaborative approach through a central 
 repository and benefits from community contributors with on-the-ground 
 knowledge. OSM Can-BICS provides a research ready dataset complete with measures 
-of bias and accuracy, and a well-defined path for future change detection 
-studies.
+of bias and accuracy in 15 test cities, and a well-defined path for future change 
+detection studies.
 
 We developed OSM-Can-BICS using the following steps:
 
