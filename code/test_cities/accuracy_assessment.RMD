@@ -765,35 +765,3 @@ prediction_infratype_city %>%
              strip.position = "left")
 
 ```
-Line chart
-```{r}
-# Libraries
-library(hrbrthemes)
-library(GGally)
-library(viridis)
-
-# Data set is provided by R natively
-data <- prediction_infratype_city %>% 
-  select(name, Can_BICS_class, size, km_per_100k) %>%
-  pivot_wider(
-    id_cols = c(name, size),
-    names_from = Can_BICS_class,
-    values_from = km_per_100k)
-
-# Plot
-ggparcoord(data,
-    columns = 3:6,
-    groupColumn = 2,
-    showPoints = TRUE, 
-    title = "Parallel Coordinate Plot for the Iris Data",
-    alphaLines = 0.3) + 
-  scale_color_viridis(discrete=TRUE) +
-  theme_ipsum()+
-  theme(
-    plot.title = element_text(size=10)
-  ) +
-  facet_wrap(~size,
-             nrow = 3,
-             scales = "free_y")
-
-```
