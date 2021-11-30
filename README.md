@@ -94,9 +94,9 @@ Requires that classify.R has been run.
 
 ## National dataset
 The national dataset uses data from 
-[Geofabrk](https://www.geofabrik.de/data/) and PostGIS for storage,
-due to the larger extent. Processing is done province-by-province, and the 
-processed data is combined into the national dataset.
+[Geofabrk](https://www.geofabrik.de/data/) and [PostGIS](https://postgis.net/) for 
+storage, due to the larger extent. Processing is done province-by-province, and 
+the processed data is combined into the national dataset.
 
 ### Database setup
 Due to the volume of data, we use PostGIS to store and manage the data. These 
