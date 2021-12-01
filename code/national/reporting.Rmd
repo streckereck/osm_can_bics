@@ -1,0 +1,507 @@
+---
+title: "National_summary"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(sf)
+library(tidyverse)
+library(knitr)
+library(RPostgreSQL)
+library(cancensus)
+
+source("../Can_BICS_OSM_functions.R")
+
+options(cancensus.api_key='CensusMapper_e0c23a6719376c837a4ae87e9e9227f2')
+options(cancensus.cache_path = 'C://working/cancensus')
+
+# stats can lambert
+target_projection <- 3347
+
+central_db_name <- "Can_BICS_provinces"
+
+csds <- st_read("C:/Users/16043/Documents/basemap/census_2016/census_subdivision_boundary/lcsd000a16a_e.shp")
+# csds <- st_read("C:/Users/cferster/Documents/basemap/census/2016/Geometry/subdivision/lcsd000b16a_e.shp")
+
+# 1. Get population and area from census
+library(cancensus)
+
+options(cancensus.api_key='CensusMapper_e0c23a6719376c837a4ae87e9e9227f2')
+options(cancensus.cache_path = 'C://working/cancensus')
+
+census_data <- get_census(dataset='CA16', regions=list(PR=c("60","61","59","48","47","46","62","35","24","10","13","12","11")), vectors=c("v_CA16_401","v_CA16_5792","v_CA16_5807"), labels="detailed", geo_format='sf', level='CSD') %>%
+  st_transform(target_projection)
+
+# first, make the name match the stats can shapefile
+census_data$short_name <- str_replace(census_data$name, " \\s*\\([^\\)]+\\)", "")
+
+# select important variables, shorten names
+census_data_rename <- census_data %>%
+  select(name = short_name,
+         CSDUID = GeoUID,
+         Dwellings,
+         Population = `v_CA16_401: Population, 2016`,
+         Area = `Area (sq km)`,
+         Commuters = `v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`,
+         Bike_Commuters = `v_CA16_5807: Bicycle`,
+         geometry)
+
+# combine the island of Montreal
+# # identify csds in montreal
+montreal_csds <- c("CÃ´te-Saint-Luc",
+                   "Côte-Saint-Luc",
+                   "Hampstead",
+                   "Mont-Royal",
+                   "MontrÃ©al-Est",
+                   "MontrÃ©al",
+                   "Montréal",
+                   "Westmount",
+                   "Beaconsfield",
+                   "Baie-D'UrfÃ©",
+                   "Baie-D'Urfé",
+                   "Sainte-Anne-de-Bellevue",
+                   "Senneville",
+                   "Dollard-Des Ormeaux",
+                   "Dorval",
+                   "Pointe-Claire",
+                   "Kirkland",
+                   "MontrÃ©al-Ouest")
+
+montreal_census <- which(grepl(paste0(montreal_csds, collapse = "|"), census_data$name) & census_data$PR_UID%in% 24 & !census_data$name %in% "L'Île-Dorval (V)") # must be in Quebec, and get rid of the Island of Dorval
+
+# sum measures for the island of montreal, remove old records
+montreal <- census_data[montreal_census, ] %>%
+  summarise(name = "Montréal",
+            CSDUID = "2466023") %>%
+  mutate(
+    Dwellings = sum(census_data_rename$Dwellings[montreal_census]),
+    Population = sum(census_data_rename$Population[montreal_census]),
+         Area = sum(census_data_rename$Area[montreal_census]),
+         Commuters = sum(census_data_rename$Commuters[montreal_census]),
+         Bike_Commuters = sum(census_data_rename$Bike_Commuters[montreal_census]))
+montreal <- montreal[ , names(census_data_rename)] # match the column order
+            
+census_data_combine <- census_data_rename[-montreal_census, ]
+
+# don't actually use this! That was a misunderstanding...
+census_data_combine <- rbind(census_data_combine,
+                                      montreal)
+
+census_data_rename$size <- base::cut(census_data_rename$Population,
+                          breaks = c(-1, 50000, 500000, Inf),
+                          labels = c("small", "medium", "large"))
+census_data_rename$Bicycle_Mode_Share <- round(100 * census_data_rename$Bike_Commuters /
+  census_data_rename$Commuters, 1)
+
+
+# try(conn <- dbConnect(PostgreSQL(), 
+#                       dbname = central_db_name,
+#                       user = "postgres"))
+# 
+#   highways_output <- st_read(conn,
+#                               "highways_output")
+#   
+# dbDisconnect(conn)
+
+  highways_output <- st_read("../../data/provincial_data/canada_data/highways_output_v2_1.shp")
+
+highways_output$length <- st_length(highways_output) %>% as.numeric()
+
+infra_levels <- c("Bike Path",
+                  "Cycle Track",
+                  "Local Street Bikeway",
+                  "Multi-Use Path",
+                  "Painted Bike Lane",
+                  "Non-Conforming")
+
+recode_ground_data_predicted <- function(Can_BICS){
+    Can_BICS_recode = recode(Can_BICS,
+  "Cycle Track (on roadway)" = "Cycle Track",
+  "Non-Conforming Major Road" = "Non-Conforming",
+  "Non-Conforming Trail" = "Non-Conforming",
+  "Non-Conforming Other" = "Non-Conforming", 
+  "None" = "Non-Conforming") %>%
+      replace_na("Non-Conforming")
+  Can_BICS_recode <- factor(Can_BICS_recode,
+                            levels = infra_levels)
+  return(Can_BICS_recode)
+}
+
+highways_output$Can_BICS_recode <- recode_ground_data_predicted(highways_output$Cn_BICS) %>% as.character()
+
+adjustment <- read_csv("../../data/pilot_cities/adjustment.csv")
+
+non_conforming <- c("Non-conforming major road",
+                                     "Non-conforming other",
+                                     "Non-conforming trail",
+                    "Non-conforming",
+                    "Non-Conforming",
+                    NA,
+                    "None",
+                    "Substandard")
+
+summary_Can_BICS <- highways_output %>%
+  st_drop_geometry() %>%
+  #filter(! Can_BICS %in% non_conforming) %>%
+  group_by(Can_BICS_recode) %>%
+  summarise(length = sum(length)/1000 %>% round(0)) %>%
+  mutate(percentage = (length / sum(length)) * 100 %>%
+           round(0)) %>%
+  mutate(length = round(length, 0),
+         percentage = round(percentage, 1))
+
+summary_Can_BICS[nrow(summary_Can_BICS) + 1, ] <- NA
+summary_Can_BICS[nrow(summary_Can_BICS), ]$Can_BICS_recode <- "Total"
+
+summary_Can_BICS[nrow(summary_Can_BICS), ]$length <- sum(summary_Can_BICS$length, na.rm = T)
+
+summary_Can_BICS[nrow(summary_Can_BICS), ]$percentage <- sum(summary_Can_BICS$percentage, na.rm = T)
+
+row.names(summary_Can_BICS) <- summary_Can_BICS$Can_BICS_recode
+
+summary_Can_BICS <- summary_Can_BICS[c(infra_levels,
+                                       "Total"),]
+
+summary_Can_BICS$adjusted_length <- (summary_Can_BICS$length / adjustment$Bias) %>% round(0)
+
+summary_Can_BICS$adjusted_length_perc <- (100 * summary_Can_BICS$adjusted_length / summary_Can_BICS[nrow(summary_Can_BICS), ]$adjusted_length) %>% round(1)
+
+summary_Can_BICS_class <- highways_output %>%
+  st_drop_geometry() %>%
+  filter(! C_BICS_ %in% non_conforming) %>%
+  group_by(C_BICS_) %>%
+  summarise(length = sum(length)/1000 %>% round(0)) %>%
+  mutate(percentage = (length / sum(length)) * 100 %>%
+           round(0)) %>%
+  mutate(length = round(length, 0),
+         percentage = round(percentage, 0))
+
+total <- sum(summary_Can_BICS_class$length)
+total_Can_BICS <- sum(summary_Can_BICS_class[which(! summary_Can_BICS_class$C_BICS_ %in% "Non-conforming"), ]$length)
+  
+total_non_conforming <- sum(highways_output[which( highways_output$C_BICS_ %in% "Non-Conforming"), ]$length) / 1000
+
+# crd <- st_read(dsn = "C://Users/16043/Documents/basemap/census_2016/census_da_boundary/crd.gpkg")
+# 
+# summary_Can_BICS_crd_class <- highways_output %>%
+#   filter(CSDNAME %in% crd$CSDNAME) %>%
+#   st_drop_geometry() %>%
+#   filter(! Can_BICS_class %in% non_conforming) %>%
+#   group_by(Can_BICS_class) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# total_non_conforming_crd <- sum(highways_output[which(highways_output$CSDNAME %in% crd$CSDNAME &
+#                                                         highways_output$Can_BICS_class %in% "Non-conforming"), ]$length)
+# 
+# 
+# ### Victoria
+# summary_Can_BICS_victoria_class <- highways_output %>%
+#   filter(CSDNAME %in% "Victoria") %>%
+#   st_drop_geometry() %>%
+#   filter(! Can_BICS_class %in% non_conforming) %>%
+#   group_by(Can_BICS_class) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# total_non_conforming_victoria <- sum(highways_output[which(highways_output$CSDNAME %in% "Victoria" &
+#                                                         highways_output$Can_BICS_class %in% "Non-conforming"), ]$length)
+
+# ### Winnipeg
+# summary_Can_BICS_winnipeg_class <- highways_output %>%
+#   filter(CSDNAME %in% "Winnipeg") %>%
+#   st_drop_geometry() %>%
+#   filter(! Can_BICS_class %in% non_conforming) %>%
+#   group_by(Can_BICS_class) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# total_non_conforming_winnipeg <- sum(highways_output[which(highways_output$CSDNAME %in% "Winnipeg" &
+#                                                         highways_output$Can_BICS_class %in% "Non-conforming"), ]$length)
+
+## Calgary
+# summary_Can_BICS_calgary <- highways_output %>%
+#   filter(CSDNAME %in% "Calgary") %>%
+#   st_drop_geometry() %>%
+#   filter(! C_BICS_ %in% non_conforming) %>%
+#   group_by(Can_BICS_recode) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# summary_Can_BICS_calgary_class <- highways_output %>%
+#   filter(CSDNAME %in% "Calgary") %>%
+#   st_drop_geometry() %>%
+#   filter(! C_BICS_ %in% non_conforming) %>%
+#   group_by(C_BICS_) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# total_non_conforming_calgary <- sum(highways_output[which(highways_output$CSDNAME %in% "Calgary" &
+#                                                         highways_output$C_BICS_ %in% "Non-Conforming"), ]$length)/1000
+
+# ### Whitehorse
+# summary_Can_BICS_whitehorse_class <- highways_output %>%
+#   filter(CSDNAME %in% "Whitehorse") %>%
+#   st_drop_geometry() %>%
+#   filter(! Can_BICS_class %in% non_conforming) %>%
+#   group_by(Can_BICS_class) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+# 
+# total_non_conforming_whitehorse <- sum(highways_output[which(highways_output$CSDNAME %in% "Whitehorse" &
+#                                                         highways_output$Can_BICS_class %in% "Non-conforming"), ]$length)
+
+
+# by size class
+# highways_output_census <- st_intersection(highways_output,
+#                                           census_data)
+
+# summary_Can_BICS_class_size <- highways_output_census %>%
+#   st_drop_geometry() %>%
+#   filter(! is.na(Can_BICS)) %>%
+#   group_by(Can_BICS_class, size) %>%
+#   summarise(length = sum(length)/1000 %>% round(0)) %>%
+#   mutate(percentage = (length / sum(length)) * 100 %>%
+#            round(0)) %>%
+#   mutate(length = round(length, 0),
+#          percentage = round(percentage, 0))
+
+```
+
+## National summary
+
+
+```{r}
+kable(summary_Can_BICS,
+      caption = "National, by infrastructure type.")
+
+kable(summary_Can_BICS_class,
+      caption = "National, by comfort class.")
+
+print(paste0("Total infrastructure: ", total))
+print(paste0("Total Can-BICS: ", total_Can_BICS))
+
+print(paste0("Total non-conforming infrastructure: ", total_non_conforming))
+
+
+# kable(summary_Can_BICS_calgary_class,
+#       caption = "Calgary, by comfort class.")
+# print(paste0("Total non-conforming infrastructure: ", total_non_conforming_calgary))
+# 
+# kable(summary_Can_BICS_calgary,
+#       caption = "Calgary, by infrastructure type.")
+# print(paste0("Total non-conforming infrastructure: ", total_non_conforming_calgary))
+
+# kable(summary_Can_BICS_crd_class,
+#       caption = "CRD, by comfort class.")
+# print(paste0("Total non-conforming infrastructure: ", total_non_conforming_crd))
+# 
+# kable(summary_Can_BICS_victoria_class,
+#       caption = "Victoria, by comfort class.")
+# print(paste0("Total non-conforming infrastructure: ", total_non_conforming_victoria))
+
+```
+
+``` {r, echo = F, warning = F}
+# Box Plot
+
+highways_output <- st_intersection(highways_output,
+                                   csds)
+
+# summarize infrastructure by type and city
+prediction_infratype_city <- get_lengths_proportions_groups(
+  highways_output,
+  highways_output$Can_BICS_recode %>% Can_BICS_class(),
+  highways_output$CSDUID)
+
+prediction_infratype_city <- prediction_infratype_city %>%
+  left_join(census_data_rename, by = c("Group" = "CSDUID")) %>%
+  filter(Population > 5000)
+
+
+prediction_infratype_city$Can_BICS_class <- prediction_infratype_city$Category %>% 
+  as.factor()
+
+# metrics
+prediction_infratype_city$km_per_100k <- (prediction_infratype_city$Length / (prediction_infratype_city$Population / 100000))
+
+prediction_infratype_city$km_per_km2 <- prediction_infratype_city$Length / (prediction_infratype_city$Area)
+
+# log transform
+prediction_infratype_city$km_per_100k_log10 <- log10(prediction_infratype_city$km_per_100k)
+prediction_infratype_city$km_per_100k_log10[which(prediction_infratype_city$km_per_100k_log10 < 0)] <- 0
+
+# get the max for each group
+prediction_infratype_city <- prediction_infratype_city %>%
+  group_by(Can_BICS_class, size) %>%
+  mutate(max_group = km_per_100k == max(km_per_100k),
+         max_label = ifelse(max_group, 
+                            paste0(name, " (", round(km_per_100k, 0)," km/100k)"), 
+                            NA))
+
+# get the min for each group
+prediction_infratype_city <- prediction_infratype_city %>%
+  group_by(Can_BICS_class, size) %>%
+  mutate(min_group = km_per_100k == min(km_per_100k),
+         min_label = ifelse(min_group, 
+                            paste0(name, " (", round(km_per_100k, 0)," km/100k)"), 
+                            NA))
+
+# multiple zeros for small
+prediction_infratype_city$min_label[which(prediction_infratype_city$size %in% "small" &
+                                            prediction_infratype_city$Length == 0)] <- NA
+
+# assign one label for eacy comfort class
+multiple_zero_text <- "Multiple (0 km/100k)"
+prediction_infratype_city$min_label[which(prediction_infratype_city$size %in% "small" &
+                                            prediction_infratype_city$Can_BICS_class %in% "1. High Comfort" & 
+                                            prediction_infratype_city$name %in% "Wilmot")] <- multiple_zero_text
+
+prediction_infratype_city$min_label[which(prediction_infratype_city$size %in% "small" &
+                                            prediction_infratype_city$Can_BICS_class %in% "2. Medium Comfort" & 
+                                            prediction_infratype_city$name %in% "Paradise")] <- multiple_zero_text
+
+prediction_infratype_city$min_label[which(prediction_infratype_city$size %in% "small" &
+                                            prediction_infratype_city$Can_BICS_class %in% "3. Low Comfort" & 
+                                            prediction_infratype_city$name %in% "Perth East")] <- multiple_zero_text
+
+prediction_infratype_city$min_label[which(prediction_infratype_city$size %in% "small" &
+                                            prediction_infratype_city$Can_BICS_class %in% "Non-Conforming" & 
+                                            prediction_infratype_city$name %in% "West Hants")] <- multiple_zero_text
+
+
+Can_BICS_colours <- c(
+  "#9C9C9C", # non_conforming: grey
+  "#73B2FF", # low: blue
+  "#89CD66", # med: light green
+  "#267300") # high: dark green
+
+prediction_infratype_city %>%
+  ggplot( aes(x = size, 
+              y = km_per_100k_log10,#Proportion * 100, 
+              fill = fct_rev(Can_BICS_class))) +
+    geom_boxplot() +
+    scale_fill_manual(values = Can_BICS_colours) +
+    scale_y_continuous(limits = c(-5, 9)) +
+    # geom_jitter(color = "black",
+    #             size = 0.6,
+    #             alpha = 0.9,
+    #             height = 0.5) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size=11)
+    ) +
+    guides(fill = guide_legend(reverse = TRUE)) +
+    ggtitle("Bicycle facilities in all census subdivisions") +
+    xlab("") +
+    ylab("log10(km / 100,000 population)") +
+    labs(fill = "Can-BICS Comfort Class") +
+    geom_text(aes(label = max_label),
+              na.rm = TRUE,
+              position = position_dodge(width = .76),
+              hjust = "left",
+              vjust = "middle",
+              size = 2.5) +
+      geom_text(aes(label = min_label),
+              na.rm = TRUE,
+              position = position_dodge(width = 0.76),
+              hjust = "right",
+              vjust = "middle",
+              size = 2.5) +
+  coord_flip()
+
+  ggsave("../../figures/boxplot_national.png")
+  
+  # get sample cities CSDUID
+  sample_cities_csds <- c("1209034", "1301006", "2443027", 
+                          "2466023", "3501012", "3506008", 
+                          "4611040", "4706027", "4811061",
+                          "4815023", "5915022", "5917034", 
+                          "5926010", "5931020", "6001009")
+  
+```
+
+``` {r, echo = F, warning = F}
+# Ridge Plot
+library(ggridges)
+prediction_infratype_city %>%
+  ggplot(aes(
+    y=fct_rev(Can_BICS_class), 
+    #x=Proportion * 100,
+    # x=(km_per_100k),
+    x = (km_per_100k_log10), 
+    fill=Can_BICS_class)) +
+  scale_fill_manual(values = rev(Can_BICS_colours)) +
+  geom_density_ridges(alpha = 0.6,
+                      scale = 2.5,
+                      jittered_points = T,
+                      position = position_points_jitter(width = 0.05, 
+                                                        height = 0),
+                      point_shape = '|', 
+                      point_size = 1, point_alpha = 1) +
+  theme_ridges() +
+  theme(axis.text.y=element_blank()) +
+  scale_x_continuous(limits = c(0, 4),
+                     labels = c("0", "10", "100", "1,000", "10,000")) +
+  ylab("") + 
+  xlab("km / 100,000 population") +
+  labs(fill = "Can-BICS Comfort Class") +
+  facet_wrap(~fct_rev(size),
+             nrow = 3,
+             strip.position = "left",
+             scales = "fixed")
+
+  ggsave("../../figures/ridges_national.pdf")
+
+
+
+prediction_infratype_city %>%
+  filter(Group %in% sample_cities_csds) %>%
+  ggplot(aes(
+    y=fct_rev(Can_BICS_class), 
+    #x=Proportion * 100,
+    # x=(km_per_100k),
+    x = (km_per_100k_log10), 
+    fill=Can_BICS_class)) +
+  scale_fill_manual(values = rev(Can_BICS_colours)) +
+  geom_density_ridges(alpha = 0.6,
+                      scale = 2.5,
+                      jittered_points = T,
+                      position = position_points_jitter(width = 0.05, 
+                                                        height = 0),
+                      point_shape = '|', 
+                      point_size = 5, point_alpha = 1) +
+  theme_ridges() +
+  theme(axis.text.y=element_blank()) +
+  scale_x_continuous(limits = c(0, 4),
+                     labels = c("0", "10", "100", "1,000", "10,000")) +
+  ylab("") + 
+  xlab("km / 100,000 population") +
+  labs(fill = "Can-BICS Comfort Class") +
+  facet_wrap(~fct_rev(size),
+             nrow = 3,
+             strip.position = "left",
+             scales = "fixed")
+
+  ggsave("../../figures/ridges_sample.pdf")
+
+
+```
