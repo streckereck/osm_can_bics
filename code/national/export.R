@@ -118,7 +118,7 @@ st_write((highways_output %>%
                          CBICS_infr = Can_BICS, 
                          CBICS_comf = Can_BICS_class) %>%
             st_collection_extract("LINESTRING")),
-           "data/provincial_data/canada_data/OSM_CAN_BICS_v1.shp",
+            "../../data/national/OSM_CAN_BICS_v1.shp",
            overwrite = T,
            delete_dsn = T)
 

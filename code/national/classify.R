@@ -14,9 +14,6 @@ source("./code/Can_BICS_OSM_functions.R")
 
 central_db_name <- "Can_BICS_provinces"
 
-# update path to CSD boundaries
-csds <- st_read("C:/Users/16043/Documents/basemap/census_2016/census_subdivision_boundary/lcsd000a16a_e.shp")
-
 library(RPostgreSQL)
 
 lookup_pruid <- function(province_abrev){

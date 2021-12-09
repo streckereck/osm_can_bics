@@ -3,16 +3,6 @@
 # * all "highways"
 # * bike routes
 # * identify which highways belong to routes, and what type
-# 
-# Starting with Vancouver and Montreal
-# 
-# The overall project flow is:
-# 
-# 1. Download data.
-# 
-#    * All highways.
-#    * Bike routes.
-#    * Identify which highways are part of bike routes.
 
 library(tidyverse)
 library(sf)
@@ -60,13 +50,12 @@ provinces <- data.frame(
 
 # download from geofabrik
 source = c("http://download.geofabrik.de/north-america/canada/")
-local_directory = c("C:/working/osm2pgsql/canada_data/")
 
 for(i in 1:nrow(provinces)){
   print(provinces$name[i])
   print(provinces$filename[i])
   download.file(url = paste0(source, provinces$filename[i]),
-                dest = paste0(local_directory, provinces$filename[i]),
+                dest = paste0(national_data_local_directory, provinces$filename[i]),
                 method = "curl",
                 mode = "w")
 }
@@ -98,7 +87,7 @@ for(i in 1:nrow(provinces)){
   system(paste0("osm2pgsql.exe -U postgres --slim -W -d ",
                 data_base_name,
                 " -S ", normalizePath(style_path),
-                paste0(local_directory, provinces$filename[i])))
+                paste0(national_data_local_directory, provinces$filename[i])))
 }
 
 # create a central database for all data
@@ -145,9 +134,6 @@ for(i in 1:nrow(provinces)){
                                                  bike_routes = routes_bike))
   
   # write to database
-  
-  library(RPostgreSQL)
-  
   try(conn <- dbConnect(PostgreSQL(), 
                         dbname = central_db_name,
                         user = "postgres"))
