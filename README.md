@@ -85,8 +85,8 @@ cities in the summer of 2020 (to match the reference data) using the query
 
 ### Data acquisition for processing
 Two additional steps are needed to download large files:
-1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB)
-2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/test_cities/classify.R`
+1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB). (data available soon)
+2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/paths_and_variables.R`
 
 ### Processing
 1. `/code/test_cities/classify.R` classifies OSM data for the 15 test cities.
@@ -116,9 +116,9 @@ from a local environment (careful in network accessible environments!).
 ### Data acquisition
 Two additional steps are needed to download large files:
 1. Download the OSM data by running `/code/national/download_data.R`. 
-2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/national/classify.R`
+2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/paths_and_variables.R`
 3. Download [Canada Census Subdivision Boundaries](https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-2016-eng.cfm), 
-store and unpack where convenient, and update the path in `code/national/classify.R`
+store and unpack where convenient, and update the path in `code/paths_and_variables.R`
 
 ### Processing
 1. `/code/national/classify.R` classifies OSM data for the provinces.
