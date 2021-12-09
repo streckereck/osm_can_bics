@@ -3,6 +3,7 @@ library(lwgeom)
 library(raster)
 library(sf)
 library(tidyverse)
+source("./code/paths_and_variables.R")
 
 # 1. Bicycle indicated
 bikes_designated <- function(osm_dataframe){
@@ -77,8 +78,7 @@ hike_mtb_indicated <- function(osm_dataframe){
      !is.na(osm_dataframe$sac_scale)) # hiking trail rating
 }
 
-# identify features which are non-conforming trails based on attributes to avoid
-# further processing
+# identify non-conforming trails based on attributes
 non_conforming_trail_attributes <- function(osm_dataframe){
   unpaved(osm_dataframe) |
     hike_mtb_indicated(osm_dataframe) & ! paved(osm_dataframe) |
@@ -92,7 +92,7 @@ non_conforming_trail_attributes <- function(osm_dataframe){
 # source: https://open.canada.ca/data/en/dataset/4e615eae-b90c-420b-adee-2ca35896caf6
 # https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip
 
-# from metadata: EPSG:3978 - NAD83 / Canada Atlas Lambert - Projected
+# 17 is urban landcover
 non_urban <- c(1, 2, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 18, 19) 
 
 
@@ -142,6 +142,8 @@ urban_landcover <- function(osm_dataframe){
         
         if(is.na(selected_highway$surface)){
           # check if located in an urban area
+          selected_highway <- selected_highway %>% 
+            st_transform(crs(landcover))
           lc <- raster::extract(landcover, selected_highway, buffer = 3)
           # DN = 17 is urban
           if(any(unlist(lc) %in% non_urban)){
@@ -191,7 +193,6 @@ road_or_path <- function(osm_dataframe){
 ###############################################################################
 # path type
 
-# Multi-use
 foot_designated <- function(osm_dataframe){
   osm_dataframe$foot %in% c("designated")
 }
@@ -422,11 +423,12 @@ minor_road <- function(osm_dataframe){
 }
 
 speed_limited <- function(osm_dataframe){
-  # character field.
+  # character field
   osm_dataframe$maxspeed %in% c("5", "10", "15", "20", "25", "30")
 }
 
 speed_not_limited <- function(osm_dataframe){
+  # character field
   osm_dataframe$maxspeed %in% c(
     "40", "45",
     "50", "55", "60", "65",
@@ -449,6 +451,7 @@ traffic_calming_attributes <- function(osm_dataframe){
 }
 
 traffic_diversion_attributes <- function(osm_dataframe){
+  # one way for motor vehicles, but not bikes
   osm_dataframe$oneway %in% T & osm_dataframe$oneway.bicycle %in% F |
     (osm_dataframe$access %in% "no" & # no motorized access
        osm_dataframe$hgv %in% c("designated"))  # heavy goods vehicle e.g. bus lane)
@@ -477,7 +480,7 @@ local_street_bikeway_attributes <- function(osm_dataframe){
 
 ###############################################################################
 # geometry check for local street bikeways
-# assumes that paths have been classified
+# assumes that paths have already been classified
 
 local_street_bikeway_geometry <- function(osm_dataframe){
   
@@ -506,9 +509,9 @@ local_street_bikeway_geometry <- function(osm_dataframe){
       selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
                                                 osm_id), ]
       
-      # a single highway could be split into two or pieces, if crossing a 
+      # a single highway could be split into two or more pieces, if crossing a 
       # census line. In that case, you only need one because they are identical,
-      # (other than the census geometry)
+      # (other than the census id)
       if(nrow(selected_highway) > 1){
         selected_highway <- selected_highway[-which(duplicated(selected_highway$osm_id)), ]
       }
@@ -680,4 +683,57 @@ local_street_bikeway_geometry <- function(osm_dataframe){
     }    
   }
   return(lsb_geometry)
+}
+
+################################################################################
+# classify
+################################################################################
+unmatched <- function(osm_dataframe){
+  osm_dataframe$nn_dist > 20
+}
+
+classify_training_data <- function(training,
+                                   highways){
+  training_join <- training %>%
+    left_join(highways %>% 
+                st_drop_geometry() %>%
+                dplyr::select(osm_id,
+                              road_or_path,
+                              path_type,
+                              lsb_geom,
+                              Can_BICS), 
+              by = c("nn_osm_id" = "osm_id"))
+  return(training_join)
+}
+
+classify_highways <- function(highways,
+                              CSDS,
+                              roundabouts){
+  
+  highways_csds <- highways %>%
+    st_intersection(CSDS)
+  
+  highways_predicted <- highways_csds %>% 
+    important_tags(c("CSDNAME", 
+                     "CSDUID",
+                     "PRNAME",
+                     desired_osm_columns))
+  
+  highways_predicted$road_or_path <- road_or_path(highways_predicted)
+  highways_predicted$path_type <- bike_path_or_cycle_track_or_MUP(highways_predicted)
+  highways_predicted$lsb_geom <- local_street_bikeway_geometry(highways_predicted)
+  highways_predicted <- highways_predicted %>% 
+    mutate(Can_BICS = case_when(
+      road_or_path %in% c("None") ~ "None",
+      road_or_path %in% c("Non-Conforming Trail") ~ "Non-Conforming Trail",
+      !is.na(path_type) ~ paste0(path_type),
+      painted_lane(highways_predicted) ~ "Painted Bike Lane",
+      cycletrack_on_roadway(highways_predicted) ~ "Cycle Track",
+      ! is.na(highways_predicted$lsb_geom) | 
+        local_street_bikeway_attributes(highways_predicted) ~ "Local Street Bikeway",
+      bikeway(highways_predicted) & 
+        major_street(highways_predicted) ~ "Non-Conforming Major Road",
+      T ~ "Non-Conforming Other"
+    ))
+  return(highways_predicted)
 }

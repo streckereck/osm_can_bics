@@ -1,29 +1,5 @@
-# Projections
-
-# stats can lambert
-target_projection <- 3347
-
-# wgs 84
-wgs_84_projection <- 4326
-
-# Consistent labels
-infra_levels <- c("Bike Path",
-                  "Cycle Track",
-                  "Local Street Bikeway",
-                  "Multi-Use Path",
-                  "Painted Bike Lane",
-                  "Non-Conforming")
-
-infra_comfort_levels <- c("1. High Comfort",
-                          "2. Medium Comfort",
-                          "3. Low Comfort",
-                          "Non-Conforming")
-
-presence_levels <- c("Can-BICS",
-                     "Non-Conforming")
-
 ################################################################################
-# functions ####################################################################
+# Assign class using infrastructure type
 ################################################################################
 
 Can_BICS_class <- function(can_BICS){
@@ -45,45 +21,6 @@ Can_BICS_class <- function(can_BICS){
     can_BICS %in% c("Non-Conforming") ~ "Non-Conforming",
     can_BICS %in% c("None") ~ "None",
     TRUE ~ "None")
-}
-
-################################################################################
-# count votes for majority infrastructure type for irr points
-################################################################################
-countVotes <- function(infratype, columns){
-  votes <- NA
-  for(i in 1:nrow(columns)){
-    votes[i] <- length(which(columns[i, ] %in% infratype))
-  }
-  return(votes)
-}
-
-get_majority <- function(columns){
-  votes <- cbind(
-    countVotes("Bike Path", columns),
-    countVotes("Cycle Track", columns),
-    countVotes("Local Street Bikeway", columns),
-    countVotes("Multi-Use Path", columns),
-    countVotes("Painted Bike Lane", columns),
-    countVotes(c("None", "Undetermined","Non-standard"), columns))
-  majority <- NA
-  for(i in 1:nrow(votes)){
-    max_column <- which(votes[i, ] %in% max(votes[i, ]))
-    
-    # check for ties
-    if(length(max_column) > 1){
-      majority[i] <- "tie"
-    } else {
-      majority[i] <- switch(max_column,
-                            "Bike Path",
-                            "Cycle Track",
-                            "Local Street Bikeway",
-                            "Multi-Use Path",
-                            "Painted Bike Lane",
-                            "None")
-    }}
-  
-  return(majority)
 }
 
 ################################################################################
@@ -109,29 +46,6 @@ get_osm_bike_routes <- function(city_name = character()){
                     value = "bicycle") %>%
     osmdata_sf(quiet = F,
                stringsAsFactors = F)
-}
-
-get_osm_natural <- function(city_name = character()){
-  natural <- getbb(city_name) %>%
-    opq()%>%
-    add_osm_feature(key = "natural") %>%
-    osmdata_sf(quiet = F,
-               stringsAsFactors = F) 
-  if(nrow(natural$osm_multipolygons) > 0){
-    natural_polygons <-  rbind(natural$osm_polygons[,c("osm_id", 
-                                                       "natural", 
-                                                       "name")],
-                               natural$osm_multipolygons[,c("osm_id", 
-                                                            "natural",
-                                                            "name")])
-  } else {
-    natural_polygons <-  rbind(natural$osm_polygons[,c("osm_id", 
-                                                       "natural",
-                                                       "name")])
-  }
-  natural_polygons <- natural_polygons %>%
-    st_transform(target_projection)
-  return(natural_polygons)
 }
 
 get_osm_turn_restrictions <- function(city_name = character()){
@@ -176,32 +90,6 @@ get_osm_roundabouts <- function(city_name = character()){
   
   
   return(roundabouts)
-}
-
-
-
-get_osm_landuse <- function(city_name = character()){
-  landuse <- getbb(city_name) %>%
-    opq()%>%
-    add_osm_feature(key = "landuse") %>%
-    osmdata_sf(quiet = F,
-               stringsAsFactors = F) 
-  
-  landuse$osm_polygons[,c("osm_id", 
-                          "landuse")]
-  
-  # if(nrow(landuse$osm_multipolygons) > 0){
-  #   landuse_polygons <-  rbind(landuse$osm_polygons[,c("osm_id", 
-  #                                                      "landuse")],
-  #                              landuse$osm_multipolygons[,c("osm_id", 
-  #                                                           "landuse")])
-  # } else {
-  #   landuse_polygons <-  rbind(landuse$osm_polygons[,c("osm_id", 
-  #                                                      "landuse")])
-  # }
-  landuse_polygons <- landuse_polygons %>%
-    st_transform(target_projection)
-  return(landuse_polygons)
 }
 
 ################################################################################
@@ -291,65 +179,9 @@ in_bike_route_postgres <- function(highways, bike_routes){
   return(highways)
 }
 
-
 ################################################################################
-# Link highways to natural areas
+# check landcover
 ################################################################################
-
-exclude_natural <- c("tree_row", "tree", "water", "wetland", "bay", "cape",
-                     "strait", "beach", "coastline", "reef", "spring", 
-                     "hot_spring", "geyser", "sand", "grass", "mud")
-natural_buffer_dist <- 3
-natural_min_area <- 10000
-
-in_natural_area <- function(highways, natural_areas){
-  # join natural tag - too slow
-  # highways <- highways %>%
-  #   st_buffer(natural_buffer_dist) %>%
-  #   select(-contains("^natural$")) %>%
-  #   st_join(natural_areas[, c("natural")] %>% st_make_valid(),
-  #           largest = T)
-  
-  # add area measure to natural areas
-  natural_areas$area <- st_area(natural_areas) %>% as.numeric()
-  
-  # count natural areas within buffer
-  highways$nat_count <- lengths(st_intersects(st_buffer(highways,
-                                                        natural_buffer_dist), 
-                                              natural_areas %>%
-                                                filter(!natural %in% exclude_natural 
-                                                       & area > natural_min_area) %>% 
-                                                st_make_valid()))
-  return(highways)
-}
-
-in_natural_area <- function(highways, natural_areas){
-  # join natural tag - too slow
-  # highways <- highways %>%
-  #   st_buffer(natural_buffer_dist) %>%
-  #   select(-contains("^natural$")) %>%
-  #   st_join(natural_areas[, c("natural")] %>% st_make_valid(),
-  #           largest = T)
-  
-  # add area measure to natural areas
-  natural_areas$area <- st_area(natural_areas) %>% as.numeric()
-  
-  # count natural areas within buffer
-  highways$nat_count <- lengths(st_intersects(st_buffer(highways,
-                                                        natural_buffer_dist), 
-                                              natural_areas %>%
-                                                filter(!natural %in% exclude_natural 
-                                                       & area > natural_min_area) %>% 
-                                                st_make_valid()))
-  return(highways)
-}
-
-# library(raster)
-# landcover <- raster("C:\\Users\\16043\\Documents\\basemap\\eosd_land_cover\\CAN_LC_2015_CAL.tif")
-
-# define projection: Canada Atlas Lambert
-wkt <- sf::st_crs(3978)[[2]]
-# proj4string(landcover) <- sp::CRS(wkt)
 
 non_urban <- c(1, 2, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 18, 19) # source: https://open.canada.ca/data/en/dataset/4e615eae-b90c-420b-adee-2ca35896caf6
 
@@ -366,35 +198,15 @@ in_natural_area_landcover <- function(ways){
     feature.proj <- as(feature %>% 
                          st_transform(3978), "Spatial")
     lc <- raster::extract(landcover, feature.proj, buffer = natural_buffer_dist)
-    # lc <- sp::over(x = feature.proj %>% line2points(),
-    #                y = landcover,
-    #                returnList = T)
     return(any(unlist(lc) %in% non_urban))
   }
   print(paste0("Number of features: ", length(which(paths))))
-  print(paste0("Time estimate (mins): ", (length(which(paths)) * 5.5) / 60))
-  print(paste0("Time estimate (hours): ", (length(which(paths)) * 5.5) / 60 / 60))
-  
-  
+
   ways[which(paths), ]$natural <- lapply(X = st_geometry(ways[which(paths), ]),
                                          FUN = check_natural)
   
   return(ways$natural)
 }
-
-# ways <- highways
-# ways <- ways %>%
-#   sample_n(5)
-# library(microbenchmark)
-# microbenchmark(lapply(X = st_geometry(ways),
-#                       FUN = check_natural),
-#                for(i in 1:nrow(ways)){
-#                  check_natural(st_geometry(ways[i, ]))
-#                },
-#                times = 3,
-#                unit = "s")
-# 
-# profvis::profvis(expr = in_natural_area_landcover(ways))
 
 ################################################################################
 # check for turn restrictions
@@ -415,7 +227,7 @@ check_turn_restrictions <- function(highways, turn_restrictions){
 }
 
 ################################################################################
-# Find nearest segment
+# Find nearest highway for reference points
 ################################################################################
 
 nearest_highway <- function(ground_pts, highways){
@@ -477,198 +289,7 @@ important_tags <- function(dataframe, tags){
   dataframe <- dataframe %>%
     fncols(tags) %>%
     dplyr::select(tags)
-  
-  # dataframe <- dataframe %>%
-  #   select(tags)
-  
   return(dataframe)
-}
-
-
-################################################################################
-# Map
-################################################################################
-
-map_ground_data_highways <- function(ground_data, 
-                                     highways,
-                                     minzoom){
-  
-  ground_data_canbics_missing <- !("Can_BICS_improved" %in% colnames(ground_data))
-  if(ground_data_canbics_missing){
-    print("Can_BICS_improved field missing in ground data!")
-  }
-  
-  highways_canbics_missing <- !("Can_BICS_improved" %in% colnames(highways))
-  if(highways_canbics_missing){
-    print("Can_BICS_improved field missing in highways!")
-  }
-  
-  highways <- highways %>%
-    mutate(colours = 
-             case_when(
-               # high comfort
-               Can_BICS_improved %in% "Bike Path" ~ "#1f78b4",
-               Can_BICS_improved %in% "Cycle Track" ~ "#33a02c",
-               Can_BICS_improved %in% "Local Street Bikeway" ~ "#6a3d9a",
-               
-               # Medium comfort
-               Can_BICS_improved %in% "Multi-Use Path" ~ "#b2df8a",
-               
-               # Low comfort
-               Can_BICS_improved %in% "Painted Bike Lane" ~ "#fb9a99",
-               
-               # Non-standard trail
-               Can_BICS_improved %in% "Non-standard trail" ~ "#7fcdbb",
-               
-               # Non-standard major road
-               Can_BICS_improved %in% "Non-standard major road" ~ "#feb24c",
-               
-               
-               # Other non-standard
-               T ~ "#636363"
-             ))
-  
-  values <- c("Bike Path",
-              "Cycle Track",
-              "Local Street Bikeway",
-              "Multi-Use Path",
-              "Painted Bike Lane",
-              "None")
-  
-  pal <- c("#1f78b4",
-           "#33a02c",
-           "#6a3d9a",
-           "#b2df8a",
-           "#fb9a99",
-           "darkgrey")
-  
-  
-  highway_features <- highways %>% 
-    st_transform(4326) %>%
-    filter(! Can_BICS_improved %in% "None") 
-  
-  ground_data$streetview_link <- NA
-  
-  for(i in 1:nrow(ground_data)){
-    ground_data[i,]$streetview_link <- street_view_url(ground_data[i,])
-  }
-  
-  ground_data$label <- paste0(
-    ifelse(! is.na(ground_data$name), 
-           paste0("<b>",ground_data$name, "</b><br/>"),
-           ""),
-    "Sample ID: ", ground_data$sample_id, "<br/>",
-    "OSM ID: ", osm_link(ground_data$nn_osm_id), "<br/>",
-    "Stratum: ", ground_data$Can_BICS_stratum, "<br/>",
-    "Observed: ", ground_data$Can_BICS_ground, "<br/>",
-    "Predicted: ", ground_data$Can_BICS_improved, "<br/>",
-    '<a href = "', ground_data$streetview_link, "\">Streetview</a>")
-  
-  highway_features$label <- paste0(
-    ifelse(! is.na(highway_features$name), 
-           paste0("<b>",highway_features$name, "</b><br/>"),
-           ""),
-    "OSM ID: ", osm_link(highway_features$osm_id), "<br/>",
-    "Predicted: ", highway_features$Can_BICS_improved)
-  
-  ground_data_features <- ground_data %>% 
-    st_transform(4326)
-  
-  ground_data_features_match <- ground_data_features %>%
-    filter(match)
-  
-  ground_data_features_nomatch <- ground_data_features %>%
-    filter(!match)
-  
-  awesome_no <- makeAwesomeIcon(
-    icon = "times circle",
-    iconColor = "black",
-    markerColor = "blue",
-    squareMarker = T,
-    library = "fa"
-  )
-  
-  awesome_yes <- makeAwesomeIcon(
-    icon = "check",
-    iconColor = "black",
-    markerColor = "blue",
-    squareMarker = T,
-    library = "fa"
-  )
-  
-  map <- leaflet(highway_features, 
-                 options = leafletOptions(minZoom = minzoom, maxZoom = 18)) %>%
-    addProviderTiles(providers$CartoDB.Positron) %>%
-    addCircleMarkers(data = ground_data_features_match,
-                     popup = ground_data_features_match$label,
-                     fillColor = "#67a9cf",
-                     fillOpacity = 0.8,
-                     radius = 7,
-                     stroke = T,
-                     color = "black",
-                     weight = 1.5,
-                     #clusterOptions = markerClusterOptions(),
-                     group = "Reference") %>%
-    addCircleMarkers(data = ground_data_features_nomatch,
-                     popup = ground_data_features_nomatch$label,
-                     fillColor = "#ef8a62",
-                     fillOpacity = 0.8,
-                     radius = 7,
-                     stroke = T,
-                     color = "black",
-                     weight = 1.5,
-                     #clusterOptions = markerClusterOptions(),
-                     group = "Reference") %>%
-    addPolylines(color = highway_features$colours,
-                 stroke = 10,
-                 popup = highway_features$label,
-                 opacity = 0.6,
-                 label = highway_features$Can_BICS_improved,
-                 highlightOptions = highlightOptions(stroke = 18,
-                                                     bringToFront = TRUE),
-                 group = "Highways") %>%
-    # addAwesomeMarkers(data = ground_data_features_match,
-    #                   popup = ground_data_features_match$label,
-    #                   icon = awesome_yes,
-    #                   group = "Reference") %>%
-    # addAwesomeMarkers(data = ground_data_features_nomatch,
-    #                   popup = ground_data_features_nomatch$label,
-    #                   icon = awesome_no,
-    #                   group = "Reference") %>%
-    addLayersControl(
-      overlayGroups = c("Reference", "Highways"),
-      options = layersControlOptions(collapsed = F)
-    )
-  
-  return(map)
-}
-
-street_view_url <- function(simpleFeature){
-  simpleFeature <- simpleFeature %>% 
-    st_transform(4326)
-  geom <- simpleFeature %>% 
-    st_coordinates() 
-  lat <- geom[2]
-  lon <- geom[1]
-  url <- paste0("https://maps.google.com/maps?q=&layer=c&cbll=", 
-                lat, 
-                ",", 
-                lon, "")
-  return(url)
-}
-
-osm_url <- function(featureID){
-  url <- paste0("https://www.openstreetmap.org/way/", 
-                featureID)
-  
-  return(url)
-}
-
-osm_link <- function(featureID){
-  link <- paste0("<a href = \"",
-                 osm_url(featureID), "\">",
-                 featureID, '</a>')
-  return(link)
 }
 
 ################################################################################
@@ -683,16 +304,6 @@ ground_data_recode_infratype <- function(Can_BICS){
                             "Non-Conforming Trail" = "None",
                             "Non-Conforming Other" = "None")
 }
-
-# levels in order are:
-infra_comfort_levels_recode <- function(comfort_levels){
-  recode(comfort_levels,
-         "1. High comfort" = "1. High Comfort",
-         "2. Medium comfort" = "2. Medium Comfort",
-         "3. Low comfort" = "3. Low Comfort")
-} 
-
-
 
 Can_BICS_class_confusion_matrix_display <- 
   function(Can_BICS_class_confusion_matrix,
@@ -758,15 +369,6 @@ Can_BICS_overall_accuracy <- function(accuracy_assessment){
   overall_tab[ , c("Statistic", "Value")] # re-order
   
   return(overall_tab)
-}
-
-recode_presence_absense <- function(infra){
-  infra %>% recode("None" = "Substandard",
-                   "Bike Path" = "Can-BICS",
-                   "Cycle Track" = "Can-BICS",
-                   "Local Street Bikeway" = "Can-BICS",
-                   "Multi-Use Path" = "Can-BICS",
-                   "Painted Bike Lane" = "Can-BICS")
 }
 
 Can_BICS_accuracy_assessment <- function(reference,
@@ -838,16 +440,6 @@ Can_BICS_accuracy_assessment_by_city <- function(reference,
   return(confusion_matrix)
 }
 
-Can_BICS_confusion_matrix_display_by_city <- function(confusion_matrix,
-                                              highways,
-                                              categories,
-                                              selected_CSDNAME){
-  highways_subset <- which(highways$CSDNAME %in% selected_CSDNAME)
-  confusion_matrix_display <- Can_BICS_confusion_matrix_display(
-    confusion_matrix,
-    highways[highways_subset, ],
-    categories[highways_subset])
-}
 
 ################################################################################
 # accuracy assessment
@@ -912,7 +504,7 @@ error_matrix_area_display <- function(
                                          `Overall` = overall_display)
   
   return(confusion_matrix_area_display)
-  }
+}
   
 overall_accuracy <- function(area_error_matrix){
   
@@ -930,47 +522,6 @@ overall_accuracy <- function(area_error_matrix){
     map_area_correct <- map_area_correct + area_error_matrix[i,j]
   }
   return(map_area_correct)
-}
-
-error_matrix_area_by_city <- function(ground_data, 
-                                      highways, 
-                                      CSDNAME_select){
-  
-  confusion_matrix_calc <- error_matrix_by_city(ground_data,
-                                                CSDNAME_select) %>%
-    as.data.frame.matrix
-  
-  prediction <- highways %>%
-    st_drop_geometry() %>%
-    filter(CSDNAME %in% CSDNAME_select)
-  
-  prediction <- prediction %>%
-    group_by(Can_BICS_recode) %>%
-    filter(! is.na(Can_BICS_recode)) %>%
-    summarise(`length (km)` = sum(length) %>% round(2)) %>%
-    mutate(proportion = (`length (km)` / sum(`length (km)`)))
-  
-  length_calc <- prediction$`length (km)`
-  names(length_calc) <- prediction$Can_BICS_recode
-  length_calc[length(length_calc) + 1] <- sum(length_calc)
-  names(length_calc)[length(length_calc)] <- "Total"
-  length_calc <- fill_in_zeros(length_calc, names(confusion_matrix_calc))
-  length_calc <- length_calc[names(confusion_matrix_calc)]
-
-  weights_calc <- prediction$proportion
-  names(weights_calc) <- prediction$Can_BICS_recode
-  weights_calc[length(weights_calc) + 1] <- sum(weights_calc)
-  names(weights_calc)[length(weights_calc)] <- "Total"
-  weights_calc <- fill_in_zeros(weights_calc, names(confusion_matrix_calc))
-  weights_calc <- weights_calc[names(confusion_matrix_calc)]
-  
-  confusion_matrix_calc$Length <- length_calc
-  confusion_matrix_calc$Proportion <- weights_calc
-  print(confusion_matrix_calc)
-  
-  confusion_matrix_area <- area_error_matrix(confusion_matrix_calc)
-  
-  return(confusion_matrix_area)
 }
 
 fill_in_zeros <- function(weights, names){
@@ -1064,7 +615,7 @@ overall_accuracy_ci <- function(confusion_matrix,
     nobs_map <- nobs_map[names(users_accuracies)]
   }
   
-  # dis-regard the totals
+  # ignore the totals
   if("Total" %in% names(weights)){ 
     q <- length(weights) - 1
   } else {
@@ -1087,151 +638,6 @@ overall_accuracy_ci <- function(confusion_matrix,
   return(1.96 * sqrt(sum(overall_accuracy_ci, na.rm = T)))
 }
 
-users_accuracy_ci <- function(confusion_matrix,
-                              confusion_matrix_area){
-  
-  users_accuracies <- users_accuracies(confusion_matrix_area)
-  
-  nobs_map <- confusion_matrix$Total
-  names(nobs_map) <- names(confusion_matrix)
-  nobs_map <- nobs_map[-which(names(nobs_map) %in% "Total")]
-  
-  # check the order matches
-  if(! identical(names(users_accuracies), names(nobs_map))){
-    print("attempting to reorder nobs_map")
-    nobs_map <- nobs_map[names(users_accuracies)]
-  }
-  
-  if("Total" %in% names(weights)){ 
-    q <- length(weights) - 1
-  } else {
-    q <- length(weights)
-  }
-  
-  # empty vector with names 
-  users_accuracy_ci_calc <- users_accuracies
-  users_accuracy_ci_calc[] <- NA
-  
-  for(i in 1:q){
-    j <- i
-    if(! is.na(users_accuracies[i])){
-      users_accuracy_ci_calc[i] <- (users_accuracies[i] * 
-                                      (1 - users_accuracies[i])) / (nobs_map[i] - 1)
-    } else {
-      users_accuracy_ci_calc[i] <- NA
-    }
-  }
-  ignore <- which(is.na(users_accuracy_ci_calc))
-  users_accuracy_ci_calc[-ignore] <- 1.96 * sqrt(users_accuracy_ci_calc[-ignore])
-  return(users_accuracy_ci_calc)
-}
-
-add_city_to_accuracy_table <- function(accuracy_table,
-                                       size,
-                                       selected_CSDNAME,
-                                       reference,
-                                       predicted,
-                                       levels,
-                                       CSDNAME,
-                                       highways){
-  
-  em <- Can_BICS_accuracy_assessment_by_city(
-    reference,
-    predicted,
-    levels,
-    CSDNAME,
-    selected_CSDNAME)
-  
-  em_display <- Can_BICS_confusion_matrix_display_by_city(
-    confusion_matrix = em,
-    highways = highways,
-    categories = highways$Can_BICS_recode,
-    selected_CSDNAME
-  )
-  
-  em_area <- error_matrix_area(reference,
-                               highways,
-                               selected_CSDNAME)
-  
-  accuracy_table[nrow(accuracy_table)+1, ] <- c(size,
-                                                CSDNAME,
-                                                em$Total[nrow(em)],
-                                                overall_accuracy(em_area),
-                                                overall_accuracy_ci(em,
-                                                                    em_area))
-  return(accuracy_table)
-}
-
-
-####################################################################### classify
-unmatched <- function(osm_dataframe){
-  osm_dataframe$nn_dist > 20
-}
-
-classify_training_data <- function(training,
-                                   highways){
-  training_join <- training %>%
-    left_join(highways %>% 
-                st_drop_geometry() %>%
-                dplyr::select(osm_id,
-                              road_or_path,
-                              path_type,
-                              lsb_geom,
-                              Can_BICS), 
-              by = c("nn_osm_id" = "osm_id"))
-  
-  return(training_join)
-}
-
-classify_highways <- function(highways,
-                              CSDS,
-                              roundabouts){
-  
-  highways_csds <- highways %>%
-    st_intersection(CSDS)
-  
-  highways_predicted <- highways_csds %>% 
-    important_tags(c("CSDNAME", 
-                     "CSDUID",
-                     "PRNAME",
-                     desired_osm_columns))
-  
-  highways_predicted$road_or_path <- road_or_path(highways_predicted)
-  highways_predicted$path_type <- bike_path_or_cycle_track_or_MUP(highways_predicted)
-  highways_predicted$lsb_geom <- local_street_bikeway_geometry(highways_predicted)
-  highways_predicted <- highways_predicted %>% 
-    mutate(Can_BICS = case_when(
-      road_or_path %in% c("None") ~ "None",
-      road_or_path %in% c("Non-Conforming Trail") ~ "Non-Conforming Trail",
-      !is.na(path_type) ~ paste0(path_type),
-      painted_lane(highways_predicted) ~ "Painted Bike Lane",
-      cycletrack_on_roadway(highways_predicted) ~ "Cycle Track (on roadway)",
-      ! is.na(highways_predicted$lsb_geom) | 
-        local_street_bikeway_attributes(highways_predicted) ~ "Local Street Bikeway",
-      bikeway(highways_predicted) & 
-        major_street(highways_predicted) ~ "Non-Conforming Major Road",
-      T ~ "Non-Conforming Other"
-    ))
-  
-  return(highways_predicted)
-  
-}
-
-################################################################################
-# non-standard to non-conforming
-
-non_standard_to_non_conforming <- function(field){
-  recoded <- recode(field,
-                    "None" = "NA",
-                    "Non-standard major road" = "Non-conforming major road",
-                    "Non-standard other" = "Non-conforming other",
-                    "Non-standard trail" = "Non-conforming trail") %>%
-    recode("None" = "NA") %>%
-    na_if(Corrected_Can_BICS, "NA")
-}
-
-
-# confusion matrix
 negatives <- function(confusion_matrix){
   total <- "Total" %in% names(confusion_matrix)
   n_cats <- length(confusion_matrix)
@@ -1335,13 +741,16 @@ false_negatives <- function(confusion_matrix){
 
 sensitivity_calc <- function(confusion_matrix){
   true_positives(confusion_matrix) /
-    confusion_matrix$Total
+    (true_positives(confusion_matrix) + false_negatives(confusion_matrix))
 }
 
 specificity_calc <- function(confusion_matrix){
   true_negatives(confusion_matrix) /
-    negatives(confusion_matrix)
+    (true_negatives(confusion_matrix) + false_positives(confusion_matrix))
 }
+
+################################################################################
+# summary stats
 
 get_lengths_proportions <- function(features,
                                     categories){

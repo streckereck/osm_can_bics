@@ -27,9 +27,12 @@ detection studies.
 
 We developed OSM-Can-BICS using the following steps:
 
-1. Analyse [Test cities](#test-cities) to develop the classification and 
+1. Process [test cities](#test-cities) to develop the classification and 
 perform an accuracy assessment.
 2. Create the [national network dataset](#national-dataset).
+
+The code and dataset are under development. Our preliminary national dataset is 
+available from [ArcGIS online](https://arcg.is/0eyGy9).
 
 ## Technology
 
@@ -42,13 +45,17 @@ perform an accuracy assessment.
   * [mapview](https://r-spatial.github.io/mapview/)
   * [osmdata](https://github.com/ropensci/osmdata) for the test cities
   * [raster](https://cran.r-project.org/web/packages/raster/index.html)
+  * [RPostgreSQL](https://cran.r-project.org/web/packages/RPostgreSQL/index.html)
   * [sf](https://r-spatial.github.io/sf/)
   * [tidyverse](https://www.tidyverse.org/packages/)
+  * [utils](https://cran.r-project.org/web/packages/R.utils/index.html) for 
+  working with files.
 * [PostGIS](https://PostGIS.net/) for the national dataset
 
 ## Test cities
-15 cities, spanning across Canada, were selected and stratified by population 
-(small < 50,000; medium 50,000 to 500,000; and large > 500,000). Both the 
+We selected 15 cities spanning across Canada, stratified by population 
+(small < 50,000; medium 50,000 to 500,000; and large > 500,000) to 
+collect reference data and perform an accuracy assessment. Both the 
 reference data and OSM data were acquired in the summer of 2020.
 
 ### Reference data
@@ -76,9 +83,9 @@ OSM data (OpenStreetMap Contributors, 2021) were downloaded for the 15 test
 cities in the summer of 2020 (to match the reference data) using the query 
 `highway = *` in the R package [osmdata](https://cran.r-project.org/web/packages/osmdata/index.html).
 
-### Data acquisition
+### Data acquisition for processing
 Two additional steps are needed to download large files:
-1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/sample_cities/` (65 MB)
+1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB)
 2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/test_cities/classify.R`
 
 ### Processing
@@ -110,11 +117,14 @@ from a local environment (careful in network accessible environments!).
 Two additional steps are needed to download large files:
 1. Download the OSM data by running `/code/national/download_data.R`. 
 2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/national/classify.R`
+3. Download [Canada Census Subdivision Boundaries](https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-2016-eng.cfm), 
+store and unpack where convenient, and update the path in `code/national/classify.R`
 
 ### Processing
 1. `/code/national/classify.R` classifies OSM data for the provinces.
   * functions to classify OSM data are located in the file `/code/Can_BICS_OSM_classify.R`. 
   * supporting functions are located in `/code/Can_BICS_OSM_functions.R`
+  * you can subset the data and run multiple simultaneous classifications.
 2. `/code/national/reporting.RMD` generates summary statistics. 
 Requires that classify.R has been run.
 3. `/code/national/export_data.R` exports data into shapefile and json formats.

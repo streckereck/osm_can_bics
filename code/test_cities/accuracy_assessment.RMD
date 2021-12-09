@@ -5,12 +5,17 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
+library(cancensus)
 library(janitor)
 library(knitr)
+library(raster)
 library(sf)
 library(tidyverse)
 
 source("../Can_BICS_OSM_functions.R")
+source("../paths_and_variables.R")
+source("../personal_paths_and_variables.R")
+
 
 ###################################################### 
 # load and recode all data consistently for comparison
@@ -27,10 +32,9 @@ source("../Can_BICS_OSM_functions.R")
 #  infratype, comfort class, and presence/absence
 #  non-conforming
 #  na for none
-# defined in Can_BICS_functions.R
 
 # load reference data for all cities
-reference_predicted <- st_read("../../data/sample_cities/reference_predicted.gpkg",
+reference_predicted <- st_read("../../data/test_cities/reference_predicted.gpkg",
                                   stringsAsFactors = F) 
 
 recode_ground_data_predicted <- function(Can_BICS){
@@ -115,7 +119,7 @@ sample_size <- training_size +
 reviewed <- nrow(reference_predicted %>% filter(reviewed))
 
 # load sample frame
-sample_frame <- st_read("../../data/sample_cities/sample_frame.gpkg")
+sample_frame <- st_read("../../data/test_cities/sample_frame.gpkg")
 
 # consistent coding
 sample_frame <- sample_frame %>% 
@@ -151,7 +155,7 @@ sampling <- tibble(`Infrastructure type` =
                        `samples (%)` = reference_predicted_by_infratype$`samples (%)`) %>%
   adorn_totals("row")
 
-highways_predict <- st_read("../../data/sample_cities/highways_all_predicted.gpkg",
+highways_predict <- st_read("../../data/test_cities/highways_all_predicted.gpkg",
                             stringsAsFactors = F)
 
 highways_predict <- highways_predict %>%
@@ -276,7 +280,8 @@ kable(confusion_matrix_display,
 
 confusion_matrix_area <- area_error_matrix(confusion_matrix_display)
 
-confusion_matrix_area_display <- error_matrix_area_display(confusion_matrix, confusion_matrix_area)
+confusion_matrix_area_display <- error_matrix_area_display(confusion_matrix, 
+                                                           confusion_matrix_area)
 
 kable(confusion_matrix_area_display,
       caption = "Table 2. Error matrix for facility type by proportion of total length.",
@@ -552,11 +557,6 @@ Figures showing the distribution of infrastructure accross cities.
 ``` {r, echo = F, include = F}
 
 # 1. Get population and area from census
-library(cancensus)
-
-options(cancensus.api_key='CensusMapper_e0c23a6719376c837a4ae87e9e9227f2')
-options(cancensus.cache_path = 'C://working/cancensus')
-
 census_data <- get_census(dataset='CA16', regions=list(PR=c("60","61","59","48","47","46","62","35","24","10","13","12","11")), vectors=c("v_CA16_401","v_CA16_5792","v_CA16_5807"), labels="detailed", geo_format='sf', level='CSD') %>%
   st_transform(target_projection)
 
@@ -660,7 +660,7 @@ prediction_infratype_city %>%
       plot.title = element_text(size=11)
     ) +
     guides(fill = guide_legend(reverse = TRUE)) +
-    ggtitle("Bicycle facilities in sample cities") +
+    ggtitle("Bicycle facilities in test cities") +
     xlab("") +
     ylab("log10(km / 100,000 population)") +
     labs(fill = "Can-BICS Comfort Class") +
@@ -677,44 +677,7 @@ prediction_infratype_city %>%
               vjust = "middle",
               size = 2.5) +
   coord_flip() 
-ggsave("../../figures/boxplot_sample_cities.png")
-
-library(viridis)
-prediction_infratype_city %>%
-  ggplot( aes(x = fct_rev(Can_BICS_class), 
-              y = log10(km_per_100k),#Proportion * 100, 
-              fill = size)) +
-    geom_boxplot() +
-    scale_fill_viridis(discrete = TRUE, alpha=0.6) +
-    scale_y_continuous(limits = c(-2, 5.3)) +
-    # geom_jitter(color = "black",
-    #             size = 0.6,
-    #             alpha = 0.9,
-    #             height = 0.5) +
-    theme_minimal() +
-    theme(
-      plot.title = element_text(size=11)
-    ) +
-    guides(fill = guide_legend(reverse = TRUE)) +
-    ggtitle("Bicycle facilities in sample cities") +
-    xlab("") +
-    ylab("log10(km / 100,000 population)") +
-    labs(fill = "Can-BICS Comfort Class") +
-    geom_text(aes(label = max_label),
-              na.rm = TRUE,
-              position = position_dodge(width = .76),
-              hjust = "left",
-              vjust = "middle",
-              size = 2.5) +
-      geom_text(aes(label = min_label),
-              na.rm = TRUE,
-              position = position_dodge(width = 0.76),
-              hjust = "right",
-              vjust = "middle",
-              size = 2.5) +
-  coord_flip() 
-  ggsave("../../figures/boxplot_sample_cities_by_size.png")
-
+ggsave("../../figures/boxplot_test_cities.png")
 ```
 
 ``` {r, echo = F, warning = F}
@@ -733,7 +696,7 @@ prediction_infratype_city %>%
     theme(
       plot.title = element_text(size=11)
     ) +
-    ggtitle("Violin plot: Bicycle facilities in sample cities") +
+    ggtitle("Violin plot: Bicycle facilities in test cities") +
     xlab("") +
     ylab("log10(km/100,000 population)") +
     labs(fill = "Can-BICS Comfort Class") +
@@ -763,5 +726,7 @@ prediction_infratype_city %>%
   facet_wrap(~fct_rev(size),
              nrow = 3,
              strip.position = "left")
+ggsave("../../figures/ridges_test_cities.png")
+
 
 ```
