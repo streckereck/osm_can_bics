@@ -47,6 +47,7 @@ available from [ArcGIS online](https://arcg.is/0eyGy9).
   * [raster](https://cran.r-project.org/web/packages/raster/index.html)
   * [RPostgreSQL](https://cran.r-project.org/web/packages/RPostgreSQL/index.html) for the national dataset
   * [sf](https://r-spatial.github.io/sf/)
+  * [testthat](https://testthat.r-lib.org/)
   * [tidyverse](https://www.tidyverse.org/packages/)
   * [utils](https://cran.r-project.org/web/packages/R.utils/index.html) for 
   working with files
