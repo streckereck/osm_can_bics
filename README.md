@@ -125,7 +125,8 @@ store and unpack where convenient, and update the path in `/code/paths_and_varia
 1. `/code/national/classify.R` classifies OSM data for the provinces.
   * functions to classify OSM data are located in the file `/code/Can_BICS_OSM_classify.R`. 
   * supporting functions are located in `/code/Can_BICS_OSM_functions.R`
-  * you can subset the data and run multiple simultaneous classifications.
+  * you can subset the data and run multiple simultaneous/parallel classifications (for efficiency).
+  * In testing, processing took approximately 1 weekend to run for the national dataset.
 2. `/code/national/export_data.R` exports data into shapefile and json formats.
 3. `/code/national/reporting.RMD` generates summary statistics. 
 Requires that `/code/national/classify.R` and `/code/national/export_data.R` have been run.
