@@ -128,4 +128,4 @@ store and unpack where convenient, and update the path in `/code/paths_and_varia
   * you can subset the data and run multiple simultaneous classifications.
 2. `/code/national/export_data.R` exports data into shapefile and json formats.
 3. `/code/national/reporting.RMD` generates summary statistics. 
-Requires that classify.R has been run.
+Requires that `/code/national/classify.R` and `/code/national/export_data.R` has been run.
