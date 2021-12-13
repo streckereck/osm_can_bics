@@ -87,7 +87,7 @@ cities in the summer of 2020 (to match the reference data) using the query
 ### Data acquisition for processing
 Two additional steps are needed to download large files:
 1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB). (data available soon)
-2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/paths_and_variables.R`
+2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `/code/paths_and_variables.R`
 
 ### Processing
 1. `/code/test_cities/classify.R` classifies OSM data for the 15 test cities.
@@ -103,7 +103,7 @@ Requires that classify.R has been run.
 ## National dataset
 The national dataset uses data from 
 [Geofabrk](https://www.geofabrik.de/data/) and [PostGIS](https://postgis.net/) for 
-storage, due to the larger extent. Processing is done province-by-province, and 
+storage, due to the large extent. Processing is done province-by-province, and 
 the processed data is combined into the national dataset.
 
 ### Database setup
@@ -115,17 +115,17 @@ steps were tested on Windows 10, but should be adaptable to other platforms.
 from a local environment (careful in network accessible environments!).
 
 ### Data acquisition
-Two additional steps are needed to download large files:
+Three additional steps are needed to download large files:
 1. Download the OSM data by running `/code/national/download_data.R`. 
-2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `code/paths_and_variables.R`
+2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `/code/paths_and_variables.R`
 3. Download [Canada Census Subdivision Boundaries](https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-2016-eng.cfm), 
-store and unpack where convenient, and update the path in `code/paths_and_variables.R`
+store and unpack where convenient, and update the path in `/code/paths_and_variables.R`
 
 ### Processing
 1. `/code/national/classify.R` classifies OSM data for the provinces.
   * functions to classify OSM data are located in the file `/code/Can_BICS_OSM_classify.R`. 
   * supporting functions are located in `/code/Can_BICS_OSM_functions.R`
   * you can subset the data and run multiple simultaneous classifications.
-2. `/code/national/reporting.RMD` generates summary statistics. 
+2. `/code/national/export_data.R` exports data into shapefile and json formats.
+3. `/code/national/reporting.RMD` generates summary statistics. 
 Requires that classify.R has been run.
-3. `/code/national/export_data.R` exports data into shapefile and json formats.
