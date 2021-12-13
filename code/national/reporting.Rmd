@@ -11,6 +11,7 @@ library(sf)
 library(tidyverse)
 
 source("../Can_BICS_OSM_functions.R")
+source("../personal_paths_and_variables.R") # cancensus api key
 
 # stats can lambert
 target_projection <- 3347
@@ -26,7 +27,7 @@ census_data$short_name <- str_replace(census_data$name, " \\s*\\([^\\)]+\\)", ""
 
 # select important variables, shorten names
 census_data_rename <- census_data %>%
-  select(name = short_name,
+  dplyr::select(name = short_name,
          CSDUID = GeoUID,
          Dwellings,
          Population = `v_CA16_401: Population, 2016`,
@@ -41,7 +42,7 @@ census_data_rename$size <- base::cut(census_data_rename$Population,
 census_data_rename$Bicycle_Mode_Share <- round(100 * census_data_rename$Bike_Commuters /
   census_data_rename$Commuters, 1)
 
-highways_output <- st_read("../../data/national/OSM_CAN_BICS_v1.shp")
+highways_output <- st_read("../../data/national/OSM_CAN_BICS.shp")
 
 highways_output$length <- st_length(highways_output) %>% as.numeric()
 
@@ -65,9 +66,7 @@ recode_ground_data_predicted <- function(Can_BICS){
   return(Can_BICS_recode)
 }
 
-highways_output$Can_BICS_recode <- recode_ground_data_predicted(highways_output$Cn_BICS) %>% as.character()
-
-adjustment <- read_csv("../../data/pilot_cities/adjustment.csv")
+highways_output$Can_BICS_recode <- recode_ground_data_predicted(highways_output$CBICS_infr) %>% as.character()
 
 non_conforming <- c("Non-conforming major road",
                                      "Non-conforming other",
@@ -100,14 +99,10 @@ row.names(summary_Can_BICS) <- summary_Can_BICS$Can_BICS_recode
 summary_Can_BICS <- summary_Can_BICS[c(infra_levels,
                                        "Total"),]
 
-summary_Can_BICS$adjusted_length <- (summary_Can_BICS$length / adjustment$Bias) %>% round(0)
-
-summary_Can_BICS$adjusted_length_perc <- (100 * summary_Can_BICS$adjusted_length / summary_Can_BICS[nrow(summary_Can_BICS), ]$adjusted_length) %>% round(1)
-
 summary_Can_BICS_class <- highways_output %>%
   st_drop_geometry() %>%
-  filter(! C_BICS_ %in% non_conforming) %>%
-  group_by(C_BICS_) %>%
+  filter(! CBICS_comf %in% non_conforming) %>%
+  group_by(CBICS_comf) %>%
   summarise(length = sum(length)/1000 %>% round(0)) %>%
   mutate(percentage = (length / sum(length)) * 100 %>%
            round(0)) %>%
@@ -137,8 +132,8 @@ print(paste0("Total non-conforming infrastructure: ", total_non_conforming))
 
 ``` {r, echo = F, warning = F}
 # Box Plot
-highways_output <- st_intersection(highways_output,
-                                   csds)
+# highways_output <- st_intersection(highways_output,
+#                                    csds)
 
 # summarize infrastructure by type and city
 prediction_infratype_city <- get_lengths_proportions_groups(
@@ -325,16 +320,20 @@ prediction_infratype_city %>%
 summary_Can_BICS_whitehorse_class <- highways_output %>%
   filter(CSDNAME %in% "Whitehorse") %>%
   st_drop_geometry() %>%
-  filter(! Can_BICS_class %in% non_conforming) %>%
-  group_by(Can_BICS_class) %>%
+  filter(! CBICS_comf %in% non_conforming) %>%
+  group_by(CBICS_comf) %>%
   summarise(length = sum(length)/1000 %>% round(0)) %>%
   mutate(percentage = (length / sum(length)) * 100 %>%
            round(0)) %>%
   mutate(length = round(length, 0),
          percentage = round(percentage, 0))
 
+highways_output %>%
+  filter(CSDNAME %in% "Whitehorse") %>% 
+  View()
+
 total_non_conforming_whitehorse <- sum(highways_output[which(highways_output$CSDNAME %in% "Whitehorse" &
-                                                        highways_output$Can_BICS_class %in% "Non-conforming"), ]$length)
+                                                        highways_output$CBICS_comf %in% non_conforming), ]$length)
 
 
 kable(summary_Can_BICS_whitehorse_class,
