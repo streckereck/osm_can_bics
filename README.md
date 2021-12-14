@@ -86,7 +86,7 @@ cities in the summer of 2020 (to match the reference data) using the query
 
 ### Data acquisition for processing
 Two additional steps are needed to download large files:
-1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/sample_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB). (data available soon)
+1. Download the [reference and OSM data](https://www.dropbox.com/s/bd6tjq0rhznfa90/test_cities.zip?dl=0) and extract to `data/test_cities/` (65 MB).
 2. Download [landcover data for Canada](https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip) (2 GB), store and unpack where convenient, and update the path in `/code/paths_and_variables.R`
 
 ### Processing
@@ -126,7 +126,8 @@ store and unpack where convenient, and update the path in `/code/paths_and_varia
   * functions to classify OSM data are located in the file `/code/Can_BICS_OSM_classify.R`. 
   * supporting functions are located in `/code/Can_BICS_OSM_functions.R`
   * you can subset the data and run multiple simultaneous/parallel classifications (for efficiency).
-  * In testing, processing took approximately 1 weekend to run for the national dataset.
+  * In testing, processing took approximately 1 weekend to run for the national 
+  dataset (start on Friday afternoon, ready for Monday morning).
 2. `/code/national/export_data.R` exports data into shapefile and json formats.
 3. `/code/national/reporting.RMD` generates summary statistics. 
 Requires that `/code/national/classify.R` and `/code/national/export_data.R` have been run.
