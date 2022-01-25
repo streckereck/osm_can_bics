@@ -86,7 +86,7 @@ for(i in 1:nrow(provinces)){
   # load data
   system(paste0("osm2pgsql.exe -U postgres --slim -W -d ",
                 data_base_name,
-                " -S ", normalizePath(style_path),
+                " -S ", normalizePath(style_path), " ",
                 paste0(national_data_local_directory, provinces$filename[i])))
 }
 

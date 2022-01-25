@@ -42,7 +42,7 @@ census_data_rename$size <- base::cut(census_data_rename$Population,
 census_data_rename$Bicycle_Mode_Share <- round(100 * census_data_rename$Bike_Commuters /
   census_data_rename$Commuters, 1)
 
-highways_output <- st_read("../../data/national/OSM_CAN_BICS.shp")
+highways_output <- st_read("../../data/national/OSM_CAN_BICS_latest.shp")
 
 highways_output$length <- st_length(highways_output) %>% as.numeric()
 
@@ -113,6 +113,8 @@ total <- sum(summary_Can_BICS_class$length)
 total_Can_BICS <- sum(summary_Can_BICS_class[which(! summary_Can_BICS_class$C_BICS_ %in% "Non-conforming"), ]$length)
   
 total_non_conforming <- sum(highways_output[which( highways_output$C_BICS_ %in% "Non-Conforming"), ]$length) / 1000
+
+
 ```
 
 ## National summary
@@ -237,7 +239,16 @@ prediction_infratype_city %>%
               size = 2.5) +
   coord_flip()
 
-
+# summary by city size
+summary_Can_BICS_class_size <- prediction_infratype_city %>%
+  group_by(size, Category) %>%
+  summarise(Length = sum(Length),
+            Length_per_km2 = sum(Length)/sum(Area),
+            Length_per_100k = sum(Length)/sum(Population)) %>%
+  mutate(percentage = (Length / sum(Length)) * 100 %>%
+           round(0)) %>%
+  mutate(Length = round(Length, 0),
+         percentage = round(percentage, 0))
   
 ```
 
