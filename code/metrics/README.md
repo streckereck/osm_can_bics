@@ -22,9 +22,9 @@ The spatial unit for the Can-BICS metrics is a 1 km circular buffer around the p
 2. The **Can-BICS categorical metric**: 5 categories assigned using K-medians clustering of the continuous measure. Category 1 represents the lowest level of infrastructure, and Category 5 represents the highest level of infrastructure. 
 
 
-
-   <img src="../../figures/metric_buffer_2.png" width="700" class="center">
-
+<p align="center">
+   <img src="../../figures/metric_buffer_2.png" width="800"/>
+</p>
 
 <p align="center">
 
