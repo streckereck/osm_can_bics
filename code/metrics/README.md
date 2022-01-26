@@ -23,7 +23,7 @@ The spatial unit for the Can-BICS metrics is a 1 km circular buffer around the p
 
 <center>
 
-<img src="figures/metric_buffer_2.png" width="400">
+<img src="../../figures/metric_buffer_2.png" width="400"/>
 </center>
 
 <center>
