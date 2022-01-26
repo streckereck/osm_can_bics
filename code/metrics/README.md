@@ -17,7 +17,7 @@ available to download from [ArcGIS online](https://arcg.is/0eyGy9).
 The spatial unit for the Can-BICS metrics is a 1 km circular buffer around the population-weighted DA centroid. There are two summary metrics for each buffer area that are assigned to each dissemination area:
 
 
-1. The **Can-BICS continuous metric**: A weighted sum of high-comfort kms (×3), medium-comfort kms (×2), and low-comfort kms (×1) within the buffer, normalized by the land area (km^2^) within each buffer. 
+1. The **Can-BICS continuous metric**: A weighted sum of high-comfort kms (×3), medium-comfort kms (×2), and low-comfort kms (×1) within the buffer, normalized by the land area (km<sup>2</sup>) within each buffer. 
 
 2. The **Can-BICS categorical metric**: 5 categories assigned using K-medians clustering of the continuous measure. Category 1 represents the lowest level of infrastructure, and Category 5 represents the highest level of infrastructure. 
 
