@@ -63,7 +63,7 @@ eastcoast <- grep("NB|PEI|NF|NS",tables_highways)
 northern <- grep("NV|NWT|YT",tables_highways)
 
 subset_data <- T
-subset_select <- c(western)
+subset_select <- c(quebec)
 
 if(subset_data){
   tables_highways <- tables_highways[subset_select]

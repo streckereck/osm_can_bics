@@ -1,6 +1,7 @@
 # This script classifies OSM data for the 15 test cities.
 library(sf)
 library(tidyverse)
+library(raster)
 source("./code/paths_and_variables.R")
 source("./code/Can_BICS_OSM_functions.R")
 source("./code/Can_BICS_OSM_classify.R")

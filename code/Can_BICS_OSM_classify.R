@@ -65,7 +65,8 @@ paved <- function(osm_dataframe){
 unpaved <- function(osm_dataframe){
   osm_dataframe$surface %in% c("unpaved", "compacted", "fine_gravel", "gravel", 
                                "ground", "dirt", "earth", "grass", "mud", 
-                               "sand", "woodchips") |
+                               "sand", "woodchips", "natural",
+                               "loose_gravel", "unpaved;gravel") |
     ((! paved(osm_dataframe)) &
        (hike_mtb_indicated(osm_dataframe)))
   
