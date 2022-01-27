@@ -6,16 +6,7 @@ library(raster)
 library(cancensus)
 library(cluster)
 
-# library(Gmedian)
-# library(ggplot2)
-#library(RColorBrewer)
-# library(factoextra)
-# library(data.table)
-# library(rgdal)
-# library(corrplot)
 options(scipen = 999)
-
-#setwd("C:/Users/jenev/sfuvault/Jeneva/Can-BICS")
 
 ### LOAD SPATIAL DATA
 
@@ -30,7 +21,7 @@ wt_centroids <- read.csv("Data/DAs/2016_92-151_XBB.csv")
 wt_centroids <- wt_centroids[!duplicated(wt_centroids[,c('DAuid.ADidu')]),] # select unique DA rows
 wt_centroids <- st_as_sf(wt_centroids, coords = c("DArplong.ADlong", "DArplat.Adlat"), crs = 4326) %>% 
   st_transform(crs(lines)) # project to statscan lambert conformal conic
-crs(lines)
+
 ### LOAD CENSUS & CAN-ALE DATA FOR CORRELATION ANALYSIS 
 
 ##Can-ALE Dataset
@@ -176,7 +167,7 @@ pam.res$medoids
 #join clustering results back to original data 
 metrics <- cbind(df, cluster = pam.res$cluster)
 
-#re-label cluster in order - class = Can-BICS category from 1 to 5
+#re-label cluster in order -> Can-BICS category from 1 to 5
 metrics$category <- metrics$cluster
 metrics$category[metrics$cluster==1] <- 2
 metrics$category[metrics$cluster==2] <- 3
