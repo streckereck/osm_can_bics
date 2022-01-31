@@ -2,7 +2,7 @@
 **The processed national network dataset is available on 
 [ArcGIS online](https://arcg.is/0PyqOu).**
 
-The project introduction is [here](../..).
+The project introduction is [here](../../README.md).
 
 The national network dataset is a classification of OpenStreetMap data using 
 consistent lables from the 
