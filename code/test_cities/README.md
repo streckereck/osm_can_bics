@@ -1,5 +1,5 @@
 # Test cities
-The project introduction is [here](../../).
+The project introduction is [here](../../README.md).
 Building a national network dataset is [here](../../code/national).
 
 
