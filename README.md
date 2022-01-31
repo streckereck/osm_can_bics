@@ -24,25 +24,30 @@ detection studies.
 
 We developed OSM-Can-BICS using the following steps:
 
-1. Process [test cities](#test-cities) to develop the classification and 
+1. Process [test cities](./code/test_cities) to develop the classification and 
 perform an accuracy assessment.
-2. Create the [national network dataset](#national-dataset).
+2. Create the [national network dataset](./code/national).
+3. Build [spatial metrics](./code/metrics) for all dissemination areas in Canada.
 
-The code and dataset are under development. Our preliminary national dataset is 
-available from [ArcGIS online](https://arcg.is/0eyGy9).
+The national network dataset is available from [ArcGIS online](https://arcg.is/0PyqOu).
+
+The national metric dataset is also available from [ArcGIS online](https://arcg.is/0eyGy9).
 
 ## Technology
 
 * [R](https://www.r-project.org/) and [R Studio](https://www.rstudio.com/)
 * R Packages:
   * [cancensus](https://mountainmath.github.io/cancensus/index.html)
+  * [cluster](https://cran.r-project.org/web/packages/cluster/cluster.pdf) for 
+the Can-BICS categorical metric
   * [ggridges](https://www.rdocumentation.org/packages/ggridges/versions/0.5.3)
   * [janitor](https://www.rdocumentation.org/packages/janitor/versions/2.1.0)
   * [lwgeom](https://cran.r-project.org/web/packages/lwgeom/index.html)
   * [mapview](https://r-spatial.github.io/mapview/)
   * [osmdata](https://github.com/ropensci/osmdata) for the test cities
   * [raster](https://cran.r-project.org/web/packages/raster/index.html)
-  * [RPostgreSQL](https://cran.r-project.org/web/packages/RPostgreSQL/index.html) for the national dataset
+  * [RPostgreSQL](https://cran.r-project.org/web/packages/RPostgreSQL/index.html) 
+for the national dataset
   * [sf](https://r-spatial.github.io/sf/)
   * [testthat](https://testthat.r-lib.org/)
   * [tidyverse](https://www.tidyverse.org/packages/)
