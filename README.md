@@ -40,8 +40,7 @@ More details and code are available here:
 The Can-BICS metrics dataset includes measures of the cycling environment for 
 all dissemination areas (DAs) in Canada. The spatial unit for the Can-BICS 
 metrics is a 1 km circular buffer around the population-weighted DA centroid. 
-Summary metrics for each buffer area that are assigned as continuous and 
-categorical metrics.
+The Can-BICS summary metrics include both a continuous measure (sum of km of cycling infrastructure per km<sup>2</sup>, weighted by Can-BICS comfort class), and a categorical measure.
 
 More details and code are available here:
 
