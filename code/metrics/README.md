@@ -40,6 +40,11 @@ The spatial unit for the Can-BICS metrics is a 1 km circular buffer around the p
   * [raster](https://cran.r-project.org/web/packages/raster/index.html)
   * [cancensus](https://mountainmath.github.io/cancensus/index.html) for correlation/validation analysis
   * [cluster](https://cran.r-project.org/web/packages/cluster/cluster.pdf) for the Can-BICS categorical metric
+  * [viridis](https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html) 
+  * [corrplot](http://www.sthda.com/english/wiki/visualize-correlation-matrix-using-correlogram)
+  * [RColorBrewer](https://cran.r-project.org/web/packages/RColorBrewer/RColorBrewer.pdf)
+  * [scales](https://scales.r-lib.org/)
+  * [ggplot2](https://ggplot2.tidyverse.org/)
 
 ### Data acquisition steps
 
@@ -66,3 +71,5 @@ To add the Can-ALE index and/or census DA-level data to the metric dataset (used
     - Create a different categorical ranking (i.e. with more or fewer categories).
 
 2. `/code/metrics/metric_results.R` generates summary statistics, and outputs correlations with the Can-ALE index, census bike-to-work, and active-transport-to-work rates. This file requires the .rdata output from `/code/metrics/calculate_metrics.R`.
+
+3. `/code/metrics/metric_figures.R` creates figures of the metric results (distribution by category, correlations etc.) This file requires the .rdata output from `/code/metrics/calculate_metrics.R`. Several figures also require a table input of population totals by CSD. 
