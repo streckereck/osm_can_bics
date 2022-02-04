@@ -66,3 +66,5 @@ To add the Can-ALE index and/or census DA-level data to the metric dataset (used
     - Create a different categorical ranking (i.e. with more or fewer categories).
 
 2. `/code/metrics/metric_results.R` generates summary statistics, and outputs correlations with the Can-ALE index, census bike-to-work, and active-transport-to-work rates. This file requires the .rdata output from `/code/metrics/calculate_metrics.R`.
+
+3. `/code/metrics/metric_figures.R` creates figures of the metric results (distribution by category, correlations etc.) This file requires the .rdata output from `/code/metrics/calculate_metrics.R`. 
