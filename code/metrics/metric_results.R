@@ -120,18 +120,18 @@ metrics %>%
 
 #Correlations by high/medium/low/total km per km2 & continuous metric 
 
-ale_r <- metrics %>%
+metrics %>%
   drop_na(ale_index) %>%
   summarise(r_total_wt = cor(ale_index, CBICS_cont), r_total = cor(ale_index, tot_km_km2), r_high = cor(ale_index, high_km2),
             r_med = cor (ale_index, med_km2), r_low = cor(ale_index, low_km2))
 
-bike_r <- metrics %>%
+metrics %>%
   drop_na(bike_per) %>%
   filter(bike_per != 0) %>%
   summarise(r_total_wt = cor(bike_per, CBICS_cont), r_total = cor(bike_per, tot_km_km2), r_high = cor(bike_per, high_km2),
             r_med = cor (bike_per, med_km2), r_low = cor(bike_per, low_km2))
 
-at_r <- metrics %>%
+metrics %>%
   drop_na(at_per) %>%
   filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
   summarise(r_total_wt = cor(at_per, CBICS_cont), r_total = cor(at_per, tot_km_km2), r_high = cor(at_per, high_km2),

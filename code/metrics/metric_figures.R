@@ -5,6 +5,7 @@ library(corrplot)
 library(RColorBrewer)
 library(scales)
 library(ggplot2)
+library(dplyr)
 options(scipen=10000)
 
 ### LOAD METRIC DATASET
@@ -37,6 +38,8 @@ ggplot(metrics, aes(x=CBICS_cont)) +
 #Distribution of DAs by category within vs. outside CMAs - BUBBLE PLOT
 
 ##Distribution of DAs by category in vs. outside CMAs
+metrics$inCMA <- ifelse(metrics$CMATYPE != "B" | is.na(metrics$CMATYPE), "Outside CMAs", "Within CMAs")
+metrics$inCMA <- factor(metrics$inCMA, levels = c("Within CMAs", "Outside CMAs"))
 cma_dist <- metrics %>%
   group_by(inCMA) %>%
   count(CBICS_cat) %>%
@@ -44,6 +47,7 @@ cma_dist <- metrics %>%
   mutate(per = (n / sum(n))*100)
 
 specify_decimal <- function(x, k) trimws(format(round(x, k), nsmall=k))
+colours <- c( "#9C9C9C",  "#B3CDE3", "#8C96C6", "#8856A7","#810F7C")
 
 ggplot(cma_dist, aes(x = inCMA, y = CBICS_cat, label = per)) + geom_point(aes(size = per, fill = factor(CBICS_cat)), shape = 21) + theme_minimal() +
   scale_size_continuous(range = c(2,24))+ 
@@ -56,7 +60,7 @@ ggplot(cma_dist, aes(x = inCMA, y = CBICS_cat, label = per)) + geom_point(aes(si
         legend.title = element_text(size = 12, face = "bold"),
         legend.position = "right")+ 
   scale_y_discrete(limits = c("(Lowest)  1", "2", "3", "4", "(Highest)  5"))+  
-  scale_x_discrete(labels = c("% of DAs \n outside CMAs", "% of DAs \n within CMAS"))+  
+  scale_x_discrete(labels = c("% of DAs \n within CMAs", "% of DAs \n outside CMAS"))+  
   scale_fill_manual(values = colours) + 
   geom_label(data=cma_dist, aes(label=paste0(specify_decimal(per,1),"%")), size=4, hjust = -0.8)+ theme(legend.position="none")
 
