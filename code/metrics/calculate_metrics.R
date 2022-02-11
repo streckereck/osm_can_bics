@@ -40,12 +40,12 @@ options(cancensus.cache_path = api$value)
 census_data <- get_census(dataset='CA16', regions=list(C="01"), 
                           vectors=c("v_CA16_5807", "v_CA16_5804","v_CA16_5801", "v_CA16_5792"), level='DA')
 
-#Calculate active transportation to work total (sum of walk/bicycle/public transit)
-census_data$at <- rowSums(census_data[,c("v_CA16_5807: Bicycle", "v_CA16_5804: Walked", "v_CA16_5801: Public transit")])
+#Calculate sustainable transportation to work total (sum of walk/bicycle/public transit)
+census_data$st <- rowSums(census_data[,c("v_CA16_5807: Bicycle", "v_CA16_5804: Walked", "v_CA16_5801: Public transit")])
 
 #calculate DA bike-to-work and active transport-to-work rates
 census_data$bike_per <- census_data$`v_CA16_5807: Bicycle`/census_data$`v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`
-census_data$at_per <- census_data$at/census_data$`v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`
+census_data$st_per <- census_data$st/census_data$`v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`
 
 ### CREATE BUFFERS AROUND CENTROIDS
 
