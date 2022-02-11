@@ -77,10 +77,10 @@ bike_r <- metrics %>%
             r_med = cor (bike_per, med_km2), r_low = cor(bike_per, low_km2))
 
 at_r <- metrics %>%
-  drop_na(at_per) %>%
-  filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
-  summarise(r_total_wt = cor(at_per, CBICS_cont), r_total = cor(at_per, tot_km_km2), r_high = cor(at_per, high_km2),
-            r_med = cor (at_per, med_km2), r_low = cor(at_per, low_km2))
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
+  summarise(r_total_wt = cor(st_per, CBICS_cont), r_total = cor(st_per, tot_km_km2), r_high = cor(st_per, high_km2),
+            r_med = cor (st_per, med_km2), r_low = cor(st_per, low_km2))
 
 cor_matrix <- rbind(bike_r, at_r, ale_r)
 
