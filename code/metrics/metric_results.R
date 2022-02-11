@@ -40,9 +40,9 @@ nrow(metrics[metrics$high_comf==0 & metrics$med_comf==0 & metrics$inCMA == "With
 #Mean bike active transport rates in vs outside CMAs
 metrics %>%
   group_by(inCMA)%>%
-  drop_na(at_per) %>%
-  filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>%
-  summarize(mean_at = mean(at_per))
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>%
+  summarize(mean_at = mean(st_per))
 
 metrics %>%
   group_by(inCMA)%>%
@@ -112,10 +112,10 @@ metrics %>%
   summarize(bike = round(mean(bike_per),3)) 
 
 metrics %>%
-  drop_na(at_per) %>%
-  filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
   group_by(CBICS_cat) %>%
-  summarize(at = round(mean(at_per),3))
+  summarize(at = round(mean(st_per),3))
 
 
 #Correlations by high/medium/low/total km per km2 & continuous metric 
@@ -132,10 +132,10 @@ metrics %>%
             r_med = cor (bike_per, med_km2), r_low = cor(bike_per, low_km2))
 
 metrics %>%
-  drop_na(at_per) %>%
-  filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
-  summarise(r_total_wt = cor(at_per, CBICS_cont), r_total = cor(at_per, tot_km_km2), r_high = cor(at_per, high_km2),
-            r_med = cor (at_per, med_km2), r_low = cor(at_per, low_km2))
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
+  summarise(r_total_wt = cor(st_per, CBICS_cont), r_total = cor(st_per, tot_km_km2), r_high = cor(st_per, high_km2),
+            r_med = cor (st_per, med_km2), r_low = cor(st_per, low_km2))
 
 ### CORRELATIONS BY CSD
 
@@ -149,10 +149,10 @@ correlations_CSDs_bike <- metrics %>%
 #active-transport to work
 correlations_CSDs_at <- metrics %>%
   filter(CSDNAME %in% cities) %>%
-  drop_na(at_per) %>%
-  filter_at(vars("at_per"), all_vars(!is.infinite(.))) %>%
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>%
   group_by(CSDNAME) %>%
-  summarise(r_at = cor(at_per, CBICS_cont))
+  summarise(r_at = cor(st_per, CBICS_cont))
 
 #can-ale
 correlations_CSDs_ale <- metrics %>%
