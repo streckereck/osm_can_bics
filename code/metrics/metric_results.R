@@ -1,154 +1,171 @@
 library(tidyr)
 library(dplyr)
 library(sf)
-library(ggrepel)
-library(viridis)
-options(scipen=10000)
 
-### LOAD DATA
-
-load(file = "Results/Can-BICS Spatial Metric.rdata")
-
+### LOAD METRIC DATASET
+load(file = "Results/Can-BICS Spatial Metric Jan 2022.rdata")
 
 #Summary statistics by high/medium/low/total/weighted total
-summary(metrics[,c("totalkm_wt_perarea","totalkm_perarea","high_perarea", "med_perarea","low_perarea")])
+summary(metrics[,c("CBICS_cont","tot_km_km2","high_km2", "med_km2","low_km2", "total_km")])
 
-#Correlations by high/medium/low/total/weighted total
-can_ale_r <- metrics %>%
-  drop_na(ale_index) %>%
-  summarise(r_total_wt = cor(ale_index, totalkm_wt_perarea), r_total = cor(ale_index, totalkm_perarea), r_high = cor(ale_index, high_perarea),
-            r_med = cor (ale_index, med_perarea), r_low = cor(ale_index, low_perarea))
+#number of DAs with no infrastructure
+length(metrics$total_km[metrics$total_km == 0])
+19213/56589 
 
-bike_r <- metrics %>%
+#number of DAs with no high or medium infrastructure
+nrow(metrics[metrics$high_comf==0 & metrics$med_comf==0, ])
+22379/56589
+
+##INSIDE vs. OUTSIDE CMA COMPARISON
+metrics$inCMA <- ifelse(metrics$CMATYPE != "B" | is.na(metrics$CMATYPE), "Outside CMAs", "Within CMAs")
+nrow(metrics[metrics$inCMA == "Within CMAs",])
+
+#number of DAs in vs. outside CMAs
+metrics %>% count(inCMA)
+#population in vs. outside CMAs
+metrics %>%
+  group_by(inCMA) %>%
+  summarize(pop = sum(Population)) %>%
+  mutate(per = pop/sum(pop))
+
+
+#number of DAs with no infrastructure in CMAs
+nrow(metrics[metrics$total_km == 0 & metrics$inCMA == "Within CMAs",])
+4719/36169
+
+#number of DAs with no medium or high comfort infrastructure in CMAs
+nrow(metrics[metrics$high_comf==0 & metrics$med_comf==0 & metrics$inCMA == "Within CMAs", ])
+7026/36169
+
+#Mean bike active transport rates in vs outside CMAs
+metrics %>%
+  group_by(inCMA)%>%
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>%
+  summarize(mean_at = mean(st_per))
+
+metrics %>%
+  group_by(inCMA)%>%
   drop_na(bike_per) %>%
-  summarise(r_total_wt = cor(bike_per, totalkm_wt_perarea), r_total = cor(bike_per, totalkm_perarea), r_high = cor(bike_per, high_perarea),
-            r_med = cor (bike_per, med_perarea), r_low = cor(bike_per, low_perarea))
-
-at_r <- metrics %>%
-  drop_na(at_per) %>%
-  summarise(r_total_wt = cor(at_per, totalkm_wt_perarea), r_total = cor(at_per, totalkm_perarea), r_high = cor(at_per, high_perarea),
-            r_med = cor (at_per, med_perarea), r_low = cor(at_per, low_perarea))
+  summarize(mean_bike = mean(bike_per))
 
 
 ### ANALYSIS BY CAN-BICS CATEGORY 
 
-#average weighted km/km2 by category
-metrics %>%
-  group_by(category) %>%
-  summarise(mean_km_wt = mean(totalkm_wt_perarea))
+#summary statistics by category
+tapply(metrics$CBICS_cont, metrics$CBICS_cat, summary)
+tapply(metrics$tot_km_km2, metrics$CBICS_cat, summary)
 
-#Frequency of each category
-category_count <- metrics %>%
-  count(category) %>%
+#distribution of DAs by category
+cat_dist <- metrics %>%
+  count(CBICS_cat) %>%
   mutate(per = n / sum(n))
 
 #Percentage of Population (DA population) by category
-category_pop <- metrics %>%
-  group_by(category) %>%
+metrics %>%
+  group_by(CBICS_cat) %>%
   summarize(pop = sum(Population))%>%
   mutate(per = pop / sum(pop))
 
-
-##INSIDE vs. OUTSIDE CMA COMPARISON
-
-metrics$inCMA <- ifelse(metrics$CMATYPE != "B" | is.na(metrics$CMATYPE), "Outside CMAs", "Within CMAs")
-
-cma_dist <- metrics %>%
-  group_by(inCMA) %>%
-  count(category) %>%
-  group_by(inCMA) %>%
-  mutate(per = (round(n / sum(n),3)))
-
-cma_pop <- metrics %>%
-  group_by(inCMA, category) %>%
+#percentage of population by category in vs. outside CMAs
+metrics %>%
+  group_by(inCMA, CBICS_cat) %>%
   summarize(pop = sum(Population))%>%
-  mutate(per = pop / sum(pop))
-
-summary(cma_dist$per)
-
-#plot distribution of DAs by category within vs. outside CMAs - BUBBLE PLOT
-colours = c( "#9C9C9C",  "#B3CDE3", "#8C96C6", "#8856A7","#810F7C")
-
-ggplot(cma_dist, aes(x = inCMA, y = category, label = per)) + geom_point(aes(size = per, fill = factor(category)), shape = 21) + theme_minimal() +
-  scale_size_continuous(range = c(2,24))+ 
-  labs( x= "", y = "Can-BICS Category\n", size = "Number of DAs", fill = "")  + 
-  theme(legend.key=element_blank(),
-        axis.text.x = element_text(colour = "black", size = 12, face = "bold"),
-        axis.text.y = element_text(colour = "black", size = 11),
-        axis.title.y = element_text(face = "bold"),
-        legend.text = element_text(size = 10, face ="bold", colour ="black"),
-        legend.title = element_text(size = 12, face = "bold"),
-        legend.position = "right")+ 
-  scale_y_discrete(limits = c("(Lowest)  1", "2", "3", "4", "(Highest)  5"))+  
-  scale_x_discrete(labels = c("% of DAs \n outside CMAs", "% of DAs \n within CMAS"))+  
-  scale_fill_manual(values = colours) + 
-  geom_label(data=cma_dist, aes(label=paste0(per*100,"%")), size=4, hjust = -0.8)+ theme(legend.position="none")
+  mutate(per = (pop / sum(pop))*100)
 
 
-#Calculate average bike & active transport to work rates by category
-category_bike <- metrics %>%
-  drop_na(bike_per) %>%
-  group_by(category) %>%
-  summarize(bike = mean(bike_per)) 
 
-category_at <- metrics %>%
-  drop_na(at_per) %>%
-  group_by(category) %>%
-  summarize(at = mean(at_per))
-
-#calculate average weighted sum (km/km2) by category
-category_wt_km <- metrics %>%
-  group_by(category) %>%
-  summarize(weighted_sum = mean(totalkm_wt_perarea))
-
-### CORRELATIONS by CITY
-
+#DISTRIBUTION of DAs by category in 16 CSDs
 cities <- c("Toronto", "Edmonton", "Ottawa", "Montréal", "Vancouver", "Winnipeg", "Halifax", "Regina", "St. John's", 
             "Calgary", "Québec", "London", "Victoria", "Saskatoon", "Charlottetown", "Whitehorse")
 
-correlations_CSDs <- metrics %>%
+category_count_CSD <- metrics %>%
+  filter(CSDNAME %in% cities) %>%
+  group_by(CSDNAME) %>%
+  count(CBICS_cat) %>%
+  mutate(per = n / sum(n))
+category_per_CSD <- spread(category_count_CSD[,c(1,2,4)], CBICS_cat, per)
+
+## read in CSD population data
+CSD_pop <- read.csv("Data/CSD Populations.csv", encoding = "UTF-8")
+names(CSD_pop) <- c("CSDNAME", "Population")
+## ADD CSD populations
+category_per_CSD <- merge(category_per_CSD, CSD_pop, by = "CSDNAME")
+category_per_CSD <- category_per_CSD[order(-category_per_CSD$Population),]
+
+#export table
+write.csv(category_per_CSD, "Results/CSD Category Distributions.csv", row.names = FALSE)
+
+##Distribution of DAs by category in vs. outside CMAs
+cma_dist <- metrics %>%
+  group_by(inCMA) %>%
+  count(CBICS_cat) %>%
+  group_by(inCMA) %>%
+  mutate(per = (n / sum(n))*100)
+
+#AVERAGE bike & active transport to work rates by category
+
+#bike to work rate within CMAs 
+metrics %>%
+  drop_na(bike_per) %>%
+  group_by(CBICS_cat) %>%
+  summarize(bike = round(mean(bike_per),3)) 
+
+metrics %>%
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
+  group_by(CBICS_cat) %>%
+  summarize(at = round(mean(st_per),3))
+
+
+#Correlations by high/medium/low/total km per km2 & continuous metric 
+
+metrics %>%
+  drop_na(ale_index) %>%
+  summarise(r_total_wt = cor(ale_index, CBICS_cont), r_total = cor(ale_index, tot_km_km2), r_high = cor(ale_index, high_km2),
+            r_med = cor (ale_index, med_km2), r_low = cor(ale_index, low_km2))
+
+metrics %>%
+  drop_na(bike_per) %>%
+  filter(bike_per != 0) %>%
+  summarise(r_total_wt = cor(bike_per, CBICS_cont), r_total = cor(bike_per, tot_km_km2), r_high = cor(bike_per, high_km2),
+            r_med = cor (bike_per, med_km2), r_low = cor(bike_per, low_km2))
+
+metrics %>%
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
+  summarise(r_total_wt = cor(st_per, CBICS_cont), r_total = cor(st_per, tot_km_km2), r_high = cor(st_per, high_km2),
+            r_med = cor (st_per, med_km2), r_low = cor(st_per, low_km2))
+
+### CORRELATIONS BY CSD
+
+#bike-to-work
+correlations_CSDs_bike <- metrics %>%
+  filter(CSDNAME %in% cities) %>%
+  drop_na(bike_per) %>%
+  group_by(CSDNAME) %>%
+  summarise(r_bike = cor(bike_per, CBICS_cont))
+
+#active-transport to work
+correlations_CSDs_at <- metrics %>%
+  filter(CSDNAME %in% cities) %>%
+  drop_na(st_per) %>%
+  filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>%
+  group_by(CSDNAME) %>%
+  summarise(r_at = cor(st_per, CBICS_cont))
+
+#can-ale
+correlations_CSDs_ale <- metrics %>%
   filter(CSDNAME %in% cities) %>%
   drop_na(ale_index) %>%
   group_by(CSDNAME) %>%
-  summarise(r_bike = cor(bike_per, totalkm_wt_perarea), r_at = cor(at_per, totalkm_wt_perarea), r_can_ale = cor (ale_index, totalkm_wt_perarea), )
+  summarise(r_can_ale = cor (ale_index, CBICS_cont))
 
-### PLOT CORRELATIONS - with csd populations and kms of infrastructure 
-
-## read in CSD population data
-CSD_pop <- read.csv("C:/Users/jenev/sfuvault2/Jeneva/Can-BICS/CSD Populations.csv", encoding = "UTF-8")
-names(CSD_pop) <- c("CSDNAME", "Population")
-
-#calculate km of infrastructure in each CSD
-
-##Can-BICS classified Data 
-lines <- st_read("C:/Users/jenev/Dropbox/Can-BICS_Existing cohorts/osm_infrastructure/data/provincial_data/canada_data/highways_output_v2_1.shp")
-
-lines$CSDNAME <- gsub("QuÃ©bec","Québec", lines$CSDNAME)
-lines$CSDNAME <- gsub("MontrÃ©al", "Montréal", lines$CSDNAME)
-
-infra <- lines %>% 
-  mutate(length = st_length(.) %>% as.numeric()) 
-
-CSD_km <- infra %>%
-  filter(CSDNAME %in% cities) %>%
-  filter(C_BICS_ != "Non-Conforming") %>% #exclude non-conforming bike lanes 
-  as_tibble() %>% 
-  group_by(CSDNAME)%>%
-  summarize(km = sum(length)/1000)
-
-
+correlations_CSDs <- merge(correlations_CSDs_bike, correlations_CSDs_at, by = "CSDNAME")
+correlations_CSDs <- merge(correlations_CSDs, correlations_CSDs_ale, by = "CSDNAME")
 correlations_CSDs <- merge(correlations_CSDs, CSD_pop, by = "CSDNAME")
-correlations_CSDs <- merge(correlations_CSDs, CSD_km, by = "CSDNAME")
 
-#PLOT CSD correlations - scatterplot 
-ggplot(correlations_CSDs, aes(x = Population, y = r_can_ale, label = CSDNAME)) + geom_point(aes(size = km,fill = r_can_ale), shape = 21) + theme_minimal() +
-  geom_text_repel(hjust = -0.4)+
-  scale_fill_viridis(option = "B", direction = -1, guide = "none")+ 
-  labs( x= "Population", y = "Correlation with Can-ALE Index\n", size = "Total kms", fill = "")+ scale_x_continuous(labels = scales::comma)
-
-ggplot(correlations_CSDs, aes(x = Population, y = r_bike, label = CSDNAME)) + geom_point(aes(size = km,fill = r_can_ale), shape = 21) + theme_minimal() +
-  geom_text_repel(hjust = -0.5)+
-  scale_fill_viridis(option = "B", direction = -1, guide = "none")+ 
-  labs( x= "Population", y = "Correlation with bike-to-work rate\n", size = "Total kms", fill = "")+ scale_x_continuous(labels = scales::comma)
-
+#save correlation table
+correlations_CSDs <- correlations_CSDs[order(-correlations_CSDs$Population),]
+write.csv(correlations_CSDs, "Results/CSD Correlations.csv", row.names = FALSE)
 
