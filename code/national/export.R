@@ -122,6 +122,33 @@ st_write((highways_output %>%
            overwrite = T,
            delete_dsn = T)
 
+
+# write intrastructure type and comfort class descriptions
+metadata_infra <- data.frame(`Comfort Class` = c("High", 
+                                    "High",
+                                    "High", 
+                                    "Medium",
+                                    "Low",
+                                    "Non-Conforming",
+                                    "Non-Conforming",
+                                    "Non-Conforming"),
+                       `Infrastructure Type` = c("Bike Path", 
+                                       "Cycletrack",
+                                       "Local Street Bikeway", 
+                                       "Multi-Use Path",
+                                       "Painted Bike Lane",
+                                       "Non-Conforming Trail",
+                                       "Non-Conforming Major Road",
+                                       "Non-Conforming Other"),
+                       `Description` = c("A paved path exclusively for cyclists away from roadways",
+                                         "A roadway lane exclusively for cyclists and physically separated from both motor vehicles and the sidewalk.",
+                                         "A local street (no centre line or lanes) where cyclists share the roadway with motor vehicles. Traffic-calming elements limit motor vehicle speeds and volumes and inhibit their through travel.",
+                                         "A two-way paved path shared by cyclists, pedestrians and other users. May be located adjacent to a roadway, if physically segregated from cars and trucks.",
+                                         "A painted lane along a roadway that is designated by bicycle and diamond pavement markings and signs as exclusively for cyclists, with no physical segregation from cars and trucks.",
+                                         "An unpaved or narrow (<3 m) path shared by cyclists, pedestrians and other users. Includes hiking and mountain biking trails, desire paths, and sidewalks where bike are permitted.",
+                                         "A major street (multiple lanes) where cyclists share the roadway with motor vehicles (i.e., sharrows).",
+                                         "All other segments where bikes are indicated on OSM without sufficient information to assign a more specific label."))
+
 # write field descriptions
 metadata <- data.frame(Variable = c("CSDNAME", 
                                     "CSDUID",
@@ -141,5 +168,6 @@ metadata <- data.frame(Variable = c("CSDNAME",
                                       "Can-BICS comfort class."))
 
 library(knitr)
+kable(metadata_infra)
 
 kable(metadata)
