@@ -20,7 +20,8 @@ roundabouts <- st_read("data/test_cities/roundabouts.gpkg")
 # 2. classify
 highways_all_predicted <- classify_highways(highways_all,
                                              selected_csds,
-                                             roundabouts) 
+                                             roundabouts)
+
 st_write(highways_all_predicted,
          "data/test_cities/highways_all_predicted.gpkg",
          delete_layer = T)

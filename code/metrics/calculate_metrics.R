@@ -8,17 +8,18 @@ library(cluster)
 library(dplyr)
 
 options(scipen = 999)
+set.seed(1223)
 
 ### LOAD SPATIAL DATA
 
 #Dissemination area Boundary shapefile
-DAs <- st_read("Data/DAs/lda_000b16a_e.shp")
+DAs <- st_read("data/DAs/lda_000a16a_e.shp")
 
 ##Can-BICS classified Data 
-lines <- st_read("Data/OSM Can-BICS/OSM_CAN_BICS_latest.shp")
+lines <- st_read("data/national/OSM_CAN_BICS_latest.shp")
 
 #Population weighted DA centroids
-wt_centroids <- read.csv("Data/DAs/2016_92-151_XBB.csv")
+wt_centroids <- read.csv("data/DAs/2016_92-151_XBB.csv")
 wt_centroids <- wt_centroids[!duplicated(wt_centroids[,c('DAuid.ADidu')]),] # select unique DA rows
 wt_centroids <- st_as_sf(wt_centroids, coords = c("DArplong.ADlong", "DArplat.Adlat"), crs = 4326) %>% 
   st_transform(crs(lines)) # project to statscan lambert conformal conic
@@ -29,12 +30,10 @@ wt_centroids <- wt_centroids %>% filter(DAuid.ADidu != 35510090)
 ### LOAD CENSUS & CAN-ALE DATA FOR CORRELATION ANALYSIS 
 
 ##Can-ALE Dataset
-can_ale <- read.csv("Data/Can-ALE/CanALE_2016.csv")
+can_ale <- read.csv("data/Can-ALE/CanALE_2016.csv")
 
 #Cancensus Package set API
-api <- source("Data/API_key.R")
-options(cancensus.api_key = api$visible)
-options(cancensus.cache_path = api$value)
+api <- source("code/personal_paths_and_variables.R")
 
 #Census: extract census bike, walk, & transit to work variables for all DAs in Canada 
 census_data <- get_census(dataset='CA16', regions=list(C="01"), 
@@ -131,7 +130,7 @@ census_data <- merge(census_data, buffers[c("DAuid.ADidu", "buffer_land_area")],
 
 
 #merge buffer rates, DA population, & Can-ALE data with Can-BICS data
-df <- merge(census_data[c("GeoUID", "bike_per", "at_per", "buffer_land_area", "Population")], merged, by.x = "GeoUID", by.y = "DAUID", ALL = TRUE)
+df <- merge(census_data[c("GeoUID", "bike_per", "st_per", "buffer_land_area", "Population")], merged, by.x = "GeoUID", by.y = "DAUID", ALL = TRUE)
 df <- merge(can_ale[c("dauid","ale_index", "ale_class")], df, by.x = "dauid", by.y = "GeoUID", ALL = TRUE)
 
 #convert can-ale indices to numeric
@@ -146,8 +145,8 @@ df$med_km2 <- df$Medium_comfort/df$buffer_land_area
 df$low_km2 <- df$Low_comfort/df$buffer_land_area
 
 #replace NAs with 0 (0km present)
-df[,31:35][is.na(df[,31:35])] <- 0
-df[,37:41][is.na(df[,37:41])] <- 0
+df[,31:33][is.na(df[,31:33])] <- 0
+df[,35:39][is.na(df[,35:39])] <- 0
 summary(df)
  
 ### K-MEDIANS CLUSTERING OF TOTAL WEIGHTED KMS
@@ -165,10 +164,16 @@ pam.res$medoids
 metrics <- cbind(df, cluster = pam.res$cluster)
 
 #re-label cluster in order -> Can-BICS category from 1 to 5
+# note that cluster order depends on clustering - may depend on the processor
+# should be in descending order of magnitude in Canada
+
+hist(metrics$cluster)
 metrics$CBICS_cat <- metrics$cluster
 metrics$CBICS_cat[metrics$cluster==1] <- 2
 metrics$CBICS_cat[metrics$cluster==2] <- 3
-metrics$CBICS_cat[metrics$cluster==3] <- 1
+metrics$CBICS_cat[metrics$cluster==3] <- 4
+metrics$CBICS_cat[metrics$cluster==4] <- 1
+metrics$CBICS_cat[metrics$cluster==5] <- 5
 
 #distribution by cluster
 hist(metrics$CBICS_cat)
@@ -185,7 +190,9 @@ names(metrics)[names(metrics) == 'tot_wt_km2'] <- 'CBICS_cont'
 metrics <- metrics %>% relocate(CBICS_cont, .before = last_col()) 
 
 #export to shapefile
-st_write(metrics, dsn = "Results/CAN_BICS_metric_Jan_2022.shp")
+st_write(metrics, 
+         dsn = "data/metrics/CAN_BICS_metric_Jan_2022.shp",
+         delete_dsn = T)
 
 ### save rdata
-save(metrics, file = "Results/Can-BICS Spatial Metric Jan 2022.rdata")
+save(metrics, file = "data/metrics/Can-BICS Spatial Metric Jan 2022.rdata")

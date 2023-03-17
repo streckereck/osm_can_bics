@@ -43,6 +43,8 @@ census_data_rename$Bicycle_Mode_Share <- round(100 * census_data_rename$Bike_Com
   census_data_rename$Commuters, 1)
 
 highways_output <- st_read("../../data/national/OSM_CAN_BICS_latest.shp")
+# highways_output <- st_read(file.choose())
+
 
 highways_output$length <- st_length(highways_output) %>% as.numeric()
 
@@ -115,6 +117,59 @@ total_Can_BICS <- sum(summary_Can_BICS_class[which(! summary_Can_BICS_class$C_BI
 total_non_conforming <- sum(highways_output[which( highways_output$C_BICS_ %in% "Non-Conforming"), ]$length) / 1000
 
 
+```
+
+## Sumarize the details of all non-conforming types
+```{r}
+summary_Can_BICS_types <- highways_output %>%
+  st_drop_geometry() %>%
+  # filter(! CBICS_comf %in% non_conforming) %>%
+  group_by(CBICS_infr) %>%
+  summarise(length = sum(length)/1000 %>% round(0)) %>%
+  mutate(percentage = (length / sum(length)) * 100 %>%
+           round(0)) %>%
+  mutate(length = round(length, 0),
+         percentage = round(percentage, 0))
+
+```
+
+## how many paths are missing surface tags??
+
+```{r}
+try(conn <- dbConnect(PostgreSQL(), 
+                      dbname = central_db_name,
+                      user = "postgres"))
+
+
+highways_output_raw <- st_read(  
+         dsn = conn, 
+         layer = "highways_output")
+
+dbDisconnect(conn)
+
+highways_output_raw$length <- st_length(highways_output_raw) %>% as.numeric()
+
+names(highways_output_raw)
+
+summary_path_surfaces <- highways_output_raw %>%
+  st_drop_geometry() %>%
+  # filter(! CBICS_comf %in% non_conforming) %>%
+  group_by(highway, surface) %>%
+  summarise(length = sum(length)/1000 %>% round(0)) %>%
+  mutate(percentage = (length / sum(length)) * 100 %>%
+           round(0)) %>%
+  mutate(length = round(length, 0),
+         percentage = round(percentage, 0))
+
+summary_highway_cycleway <- highways_output_raw %>%
+  st_drop_geometry() %>%
+  # filter(! CBICS_comf %in% non_conforming) %>%
+  group_by(cycleway, highway) %>%
+  summarise(length = sum(length)/1000 %>% round(0)) %>%
+  mutate(percentage = (length / sum(length)) * 100 %>%
+           round(0)) %>%
+  mutate(length = round(length, 0),
+         percentage = round(percentage, 0))
 ```
 
 ## National summary

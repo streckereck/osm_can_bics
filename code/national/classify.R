@@ -55,15 +55,16 @@ dbDisconnect(conn)
 tables_highways <- tables_highways[order(tables_highways)]
 tables_roudabouts <- tables_roudabouts[order(tables_roudabouts)]
 
-western <- grep("BC",tables_highways)
-prairies <- grep("AB|MB|SK",tables_highways)
-ontario <- grep("ON",tables_highways)
-quebec <- grep("QC",tables_highways)
-eastcoast <- grep("NB|PEI|NF|NS",tables_highways)
-northern <- grep("NV|NWT|YT",tables_highways)
+test <- grep("NB",tables_highways)
+western <- grep("BC", tables_highways)
+prairies <- grep("AB|MB|SK", tables_highways)
+ontario <- grep("ON", tables_highways)
+quebec <- grep("QC", tables_highways)
+eastcoast <- grep("NB|PEI|NF|NS", tables_highways)
+northern <- grep("NV|NWT|YT", tables_highways)
 
 subset_data <- T
-subset_select <- c(quebec)
+subset_select <- c(northern)
 
 if(subset_data){
   tables_highways <- tables_highways[subset_select]

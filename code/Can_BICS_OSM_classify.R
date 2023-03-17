@@ -1,6 +1,7 @@
 # Functions to classify OSM Can-BICS infrastructure type
 library(lwgeom)
 library(raster)
+library(terra)
 library(sf)
 library(tidyverse)
 source("./code/paths_and_variables.R")
@@ -125,8 +126,7 @@ urban_landcover <- function(osm_dataframe){
       
       osm_id <- selected_feature$osm_id
 
-      selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
-                                                osm_id), ]
+      selected_highway <- osm_dataframe[paths_check[i], ]
       
       # check for match
       if(nrow(selected_highway) == 0){
@@ -144,10 +144,17 @@ urban_landcover <- function(osm_dataframe){
         if(is.na(selected_highway$surface)){
           # check if located in an urban area
           selected_highway <- selected_highway %>% 
-            st_transform(crs(landcover))
-          lc <- raster::extract(landcover, selected_highway, buffer = 3)
+            st_transform(crs(landcover_terra))
+          if(any(st_geometry_type(selected_highway) %in% "GEOMETRYCOLLECTION")){
+            selected_highway <- st_collection_extract(
+              x = selected_highway,
+              type = c("LINESTRING"))
+          }
+          # lc <- raster::extract(landcover, selected_highway, buffer = 3)
+          lc <- terra::extract(landcover_terra,
+                               terra::vect(selected_highway))
           # DN = 17 is urban
-          if(any(unlist(lc) %in% non_urban)){
+          if(any(unlist(lc$CAN_LC_2015_CAL) %in% non_urban)){
             print("non-urban. assuming unpaved.")
             urban = F
             urban_result[feature_index] <- F
@@ -269,9 +276,16 @@ bike_path_or_cycle_track_or_MUP <- function(osm_dataframe){
     
     osm_id <- selected_feature$osm_id
 
-    selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in% 
+    selected_highway <- osm_dataframe[which(osm_dataframe$osm_id %in%
                                               osm_id), ]
-    
+
+    # a single highway could be split into two or more pieces, if crossing a 
+    # census line. In that case, you only need one because they are identical,
+    # (other than the census id)
+    if(nrow(selected_highway) > 1){
+      selected_highway <- selected_highway[-which(duplicated(selected_highway$osm_id)), ]
+    }
+        
     selected_highway$length <- selected_highway %>% st_length() %>% as.numeric()
     
     print(selected_highway$name)
@@ -390,9 +404,18 @@ cycletrack_on_roadway <- function(osm_dataframe){
 
 painted_lane <- function(osm_dataframe){
   osm_dataframe$road_or_path %in% "Road" &
-    (osm_dataframe$cycleway %in% c("lane", "buffered_lane") | 
-       osm_dataframe$cycleway.left %in% c("lane", "buffered_lane") |
-       osm_dataframe$cycleway.right %in% c("lane", "buffered_lane") |
+    (osm_dataframe$cycleway %in% c("exclusive", 
+                                   "lane", 
+                                   "buffered_lane") | 
+       osm_dataframe$cycleway.left %in% c("exclusive", 
+                                          "lane", 
+                                          "buffered_lane") |
+       osm_dataframe$cycleway.right %in% c("exclusive", 
+                                           "lane", 
+                                           "buffered_lane") |
+       osm_dataframe$cycleway.both %in% c("exclusive", 
+                                          "lane", 
+                                          "buffered_lane") |
        (osm_dataframe$cycleway.left %in% "opposite_lane" &
           osm_dataframe$cycleway.right %in% "shared_lane") |
        (osm_dataframe$cycleway.right %in% "opposite_lane" &
@@ -537,7 +560,7 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         
         if(! is.na(selected_highway$local_cycle_network_name)){
           segments_same_local_cycle_network_name <- osm_dataframe %>%
-            filter(CSDNAME %in% selected_highway$CSDNAME) %>%
+            # filter(CSDNAME %in% selected_highway$CSDNAME) %>%
             filter(local_cycle_network_name %in% 
                      selected_highway$local_cycle_network_name)
         } else {
@@ -546,7 +569,7 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         
         if(! is.na(selected_highway$regional_cycle_network_name)){
           segments_same_regional_cycle_network_name <- osm_dataframe %>%
-            filter(CSDNAME %in% selected_highway$CSDNAME) %>%
+            # filter(CSDNAME %in% selected_highway$CSDNAME) %>%
             filter(regional_cycle_network_name %in% 
                      selected_highway$regional_cycle_network_name)
         } else {
@@ -555,7 +578,7 @@ local_street_bikeway_geometry <- function(osm_dataframe){
         
         if(! is.na(selected_highway$national_cycle_network_name)){
           segments_same_national_cycle_network_name <- osm_dataframe %>%
-            filter(CSDNAME %in% selected_highway$CSDNAME) %>%
+            # filter(CSDNAME %in% selected_highway$CSDNAME) %>%
             filter(national_cycle_network_name %in% 
                      selected_highway$national_cycle_network_name)
         } else {
@@ -564,7 +587,7 @@ local_street_bikeway_geometry <- function(osm_dataframe){
       } else {
         if(! is.na(selected_highway$name)){
           segments_same_name <- osm_dataframe %>%
-            filter(CSDNAME %in% selected_highway$CSDNAME) %>%
+            # filter(CSDNAME %in% selected_highway$CSDNAME) %>%
             filter(name %in% selected_highway$name)
         } else {
           segments_same_name <- selected_highway
@@ -592,7 +615,7 @@ local_street_bikeway_geometry <- function(osm_dataframe){
       # select roundabouts that are touching
       touching_threshold <- 5 # if within 5 m
       touching_segments <- osm_dataframe %>% 
-        filter(osm_dataframe$CSDNAME %in% selected_highway$CSDNAME) %>%
+        # filter(osm_dataframe$CSDNAME %in% selected_highway$CSDNAME) %>%
         st_intersection(segments_same_name_search_dist %>%
                           st_buffer(touching_threshold))
       

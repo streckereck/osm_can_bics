@@ -32,7 +32,7 @@ presence_levels <- c("Can-BICS",
 ################################################################################
 # source: shapefile of census subdivisions digital boundary file
 # https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-2016-eng.cfm
-csds <- st_read("C:/working/csds/lcsd000a16a_e.shp")
+csds <- st_read("C:/Users/16043/Documents/basemap/census_2021/census_csd_boundary/lcsd000b21a_e.shp")
 
 ################################################################################
 # Landcover
@@ -47,6 +47,9 @@ landcover <- raster("C:/working/landcover/CAN_LC_2015_CAL.tif")
 
 wkt <- sf::st_crs(3978)[[2]]
 proj4string(landcover) <- sp::CRS(wkt)
+
+
+landcover_terra <- rast("C:/working/landcover/CAN_LC_2015_CAL.tif")
 
 ################################################################################
 # National data download directory

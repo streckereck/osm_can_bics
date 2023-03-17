@@ -76,13 +76,13 @@ bike_r <- metrics %>%
   summarise(r_total_wt = cor(bike_per, CBICS_cont), r_total = cor(bike_per, tot_km_km2), r_high = cor(bike_per, high_km2),
             r_med = cor (bike_per, med_km2), r_low = cor(bike_per, low_km2))
 
-at_r <- metrics %>%
+st_r <- metrics %>%
   drop_na(st_per) %>%
   filter_at(vars("st_per"), all_vars(!is.infinite(.))) %>% #remove 1 DA with main mode of commuting sample = 0 
   summarise(r_total_wt = cor(st_per, CBICS_cont), r_total = cor(st_per, tot_km_km2), r_high = cor(st_per, high_km2),
             r_med = cor (st_per, med_km2), r_low = cor(st_per, low_km2))
 
-cor_matrix <- rbind(bike_r, at_r, ale_r)
+cor_matrix <- rbind(bike_r, st_r, ale_r)
 
 rownames(cor_matrix) <- c("Bike-to-work rates","Active-transport-to-work rates","Can-ALE Index")
 names(cor_matrix) <- c("Can-BICS continuous metric", "Total comfort kms/km2", "High comfort kms/km2", "Medium comfort kms/km2", 
