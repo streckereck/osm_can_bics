@@ -91,10 +91,10 @@ st_write(highways_output,
 dbDisconnect(conn)
 
 # # write to geojson for uploading
-# st_write(highways_output %>%
-#            filter(! is.na(Can_BICS)),
-#            "data/provincial_data/highways_output.geojson",
-#            delete_dsn = T)
+st_write(highways_output %>%
+           filter(! is.na(Can_BICS)),
+           "data/national/highways_output_v3.geojson",
+           delete_dsn = T)
 # 
 # # write to gpkg for conversion and display
 # st_write((highways_output %>%
@@ -118,7 +118,7 @@ st_write((highways_output %>%
                          CBICS_infr = Can_BICS, 
                          CBICS_comf = Can_BICS_class) %>%
             st_collection_extract("LINESTRING")),
-            "./data/national/OSM_CAN_BICS_latest.shp",
+            "data/national/OSM_CAN_BICS_v3.shp",
            overwrite = T,
            delete_dsn = T)
 

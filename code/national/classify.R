@@ -18,20 +18,20 @@ library(RPostgreSQL)
 
 lookup_pruid <- function(province_abrev){
   case_when(
-    province_abrev %in% "AB" ~ 48,
-    province_abrev %in% "BC" ~ 59,
-    province_abrev %in% "MB" ~ 46,
-    province_abrev %in% "NB" ~ 13,
-    province_abrev %in% "NF" ~ 10,
-    province_abrev %in% "NWT" ~ 61,
-    province_abrev %in% "NS" ~ 12,
-    province_abrev %in% "NV" ~ 62,
-    province_abrev %in% "ON" ~ 35,
-    province_abrev %in% "PEI" ~ 11,
-    province_abrev %in% "ON" ~ 35,
-    province_abrev %in% "QC" ~ 24,
-    province_abrev %in% "SK" ~ 47,
-    province_abrev %in% "YT" ~ 60
+    province_abrev %in% "ab" ~ 48,
+    province_abrev %in% "bc" ~ 59,
+    province_abrev %in% "mb" ~ 46,
+    province_abrev %in% "nb" ~ 13,
+    province_abrev %in% "nf" ~ 10,
+    province_abrev %in% "nwt" ~ 61,
+    province_abrev %in% "ns" ~ 12,
+    province_abrev %in% "nvt" ~ 62,
+    province_abrev %in% "on" ~ 35,
+    province_abrev %in% "pei" ~ 11,
+    province_abrev %in% "on" ~ 35,
+    province_abrev %in% "qc" ~ 24,
+    province_abrev %in% "sk" ~ 47,
+    province_abrev %in% "yt" ~ 60
   )
 }
 
@@ -41,7 +41,6 @@ try(conn <- dbConnect(PostgreSQL(),
                       user = "postgres"))
   tables <- dbListTables(conn)
   tables_highways <- tables[str_detect(tables, "highways_[:alpha:]+$")]
-  tables_highways <- tables_highways[-which(tables_highways %in% "highways_output")]
   tables_roudabouts <- tables[grep("round*", tables)]
 dbDisconnect(conn)
 
@@ -55,13 +54,13 @@ dbDisconnect(conn)
 tables_highways <- tables_highways[order(tables_highways)]
 tables_roudabouts <- tables_roudabouts[order(tables_roudabouts)]
 
-test <- grep("NB",tables_highways)
-western <- grep("BC", tables_highways)
-prairies <- grep("AB|MB|SK", tables_highways)
-ontario <- grep("ON", tables_highways)
-quebec <- grep("QC", tables_highways)
-eastcoast <- grep("NB|PEI|NF|NS", tables_highways)
-northern <- grep("NV|NWT|YT", tables_highways)
+test <- grep("nb",tables_highways)
+western <- grep("bc", tables_highways)
+prairies <- grep("ab|mb|sk", tables_highways)
+ontario <- grep("on", tables_highways)
+quebec <- grep("qc", tables_highways)
+eastcoast <- grep("nb|pei|nf|ns", tables_highways)
+northern <- grep("nvt|nwt|yt", tables_highways)
 
 subset_data <- T
 subset_select <- c(northern)
@@ -107,7 +106,7 @@ if(subset_data){
                             user = "postgres"))
       do.call("<-",list("roundabouts",
                         st_read(dsn = conn,
-                                layer = "roundabouts_YT")))
+                                layer = "roundabouts_yt")))
       dbDisconnect(conn)
       
       roundabouts <- roundabouts[-c(1:nrow(roundabouts)),]

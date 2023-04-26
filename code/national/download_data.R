@@ -22,31 +22,64 @@ style_path <- "./code/national/can_bics.style"
 # Version 3 uses version 230123 to match Strava Metro
 
 # download stats can province boundary files from: https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21
-# then open in QGIS, and for each province:
-# buffer out 1000m 
-# simplify with a threshold of 1000m
-# use the QGIS Export OSM Poly plugin to export, using the abbreviation in 
-# lowercase for a name (e.g. ab, bc, mb, etc.)
 
-# use osmosis to create a pbf for each province and territory:
-# osmosis --read-pbf file=planet-230123.osm.pbf --bounding-polygon file=nwt.poly --write-pbf nwt.pbf
-
-directory <- "C:/working/planet_osm/"
 
 provinces <- data.frame(
   name = c("ab",
            "bc",
            "mb",
            "nb",
-           "nf",
+           "nl",
            "nwt",
            "ns",
            "nvt",
-           "on_simple",
+           "on",
            "pei",
            "qc",
            "sk",
-           "yt"))
+           "yt")) %>%
+  arrange(name)
+
+create_boundary_files <- F
+
+if(create_boundary_files){
+# create simplified provinces
+provinces_boundary <- st_read("C:/Users/16043/Documents/basemap/census_2021/census_pr_boundary/lpr_000a21a_e.shp") %>%
+  arrange(PREABBR)
+
+provinces_boundary$PREABBR[which(provinces_boundary$PRENAME %in% "Nunavut")] <- "N.V.T."
+
+provinces_boundary <- provinces_boundary %>%
+  arrange(PREABBR)
+
+provinces_boundary$name <- provinces$name
+
+buffer_dist <- 1000
+
+for(i in 1:nrow(provinces)){
+  province_simple <- st_buffer(provinces_boundary[i, ],
+                               buffer_dist) %>%
+    st_simplify(
+      preserveTopology = T,
+      dTolerance = buffer_dist) %>%
+    mutate(name = provinces$name[i]) %>%
+    st_cast("MULTIPOLYGON") %>%
+    st_write(paste0("C:/working/planet_osm/", 
+                    provinces$name[i],
+                    ".gpkg"),
+             delete_dsn = T)
+}}
+
+# manual step: use QGIS to export to POLY files
+# use the QGIS Export OSM Poly plugin to export using the name field 
+
+
+# use osmosis to create a pbf for each province and territory:
+# osmosis --read-pbf file=planet-230123.osm.pbf --bounding-polygon file=nwt.poly --write-pbf nwt.pbf
+
+directory <- "C:/working/planet_osm/"
+
+
 
 provinces <- data.frame(provinces) 
 provinces$directory <- directory
@@ -98,6 +131,7 @@ if(geofabrik){
                   mode = "w")
   }
 }
+
 # load into postGIS
 # this depends on having post gis installed, and a default account named 
 # postgres with no password (when executed in a local environment). 
