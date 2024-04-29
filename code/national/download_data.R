@@ -73,9 +73,26 @@ for(i in 1:nrow(provinces)){
 # manual step: use QGIS to export to POLY files
 # use the QGIS Export OSM Poly plugin to export using the name field 
 
-
+# open a commmand prompt in the directory: C:\\working\\planet_osm
 # use osmosis to create a pbf for each province and territory:
-# osmosis --read-pbf file=planet-230123.osm.pbf --bounding-polygon file=nwt.poly --write-pbf nwt.pbf
+
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=ab.poly --write-pbf ab_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=bc.poly --write-pbf bc_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=mb.poly --write-pbf mb_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=nb.poly --write-pbf nb_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=nl.poly --write-pbf nl_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=ns.poly --write-pbf ns_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=on.poly --write-pbf on_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=pei.poly --write-pbf pei_2024.pbf
+
+
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=qc.poly --write-pbf qc_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=sk.poly --write-pbf sk_2024.pbf
+
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=yt.poly --write-pbf yt_2024.pbf
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=nvt.poly --write-pbf nvt_2024.pbf
+
+# osmosis --read-pbf file=E:\planet-240115.osm.pbf --bounding-polygon file=nwt.poly --write-pbf nwt_2024.pbf
 
 directory <- "C:/working/planet_osm/"
 
@@ -84,7 +101,8 @@ directory <- "C:/working/planet_osm/"
 provinces <- data.frame(provinces) 
 provinces$directory <- directory
 
-provinces$filename <- paste0(directory, provinces$name, ".pbf")
+provinces$filename <- paste0(directory, provinces$name, "_2024.pbf")
+provinces$name <- paste0(provinces$name, "_2024")
 
 geofabrik <- F
 if(geofabrik){
@@ -141,6 +159,14 @@ if(geofabrik){
 # Tested on Windows 10.
 
 for(i in 1:nrow(provinces)){
+  # load qc in 2018
+  # provinces <- data.frame(provinces) 
+  # provinces$directory <- directory
+  # provinces <- provinces %>% filter(name %in% "qc_2024")
+  # provinces[1, ]$name <- "qc_2018"
+  # provinces[1, ]$filename <- "C:/working/planet_osm/quebec-180101.osm.pbf"
+  # i <- 1
+  
   print(i)
   print(provinces$name[i])
   print(provinces$filename[i])
@@ -226,6 +252,6 @@ for(i in 1:nrow(provinces)){
            delete_dsn = T)
   
   dbDisconnect(conn) 
-  print(paste0("Write to db", provinces$name[i]))
+  print(paste0("Write to db ", provinces$name[i]))
   
 }

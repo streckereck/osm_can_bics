@@ -13,19 +13,27 @@ set.seed(1223)
 ### LOAD SPATIAL DATA
 
 #Dissemination area Boundary shapefile
-DAs <- st_read("data/DAs/lda_000a16a_e.shp")
+DAs <- st_read("data/DAs/2021/lda_000a21a_e.shp")
 
 ##Can-BICS classified Data 
-lines <- st_read("data/national/OSM_CAN_BICS_latest.shp")
+lines_2022 <- st_read("data/national/OSM_CAN_BICS_latest.shp")
+lines <- st_read("data/national/OSM_CAN_BICS_v3.shp")
+
 
 #Population weighted DA centroids
-wt_centroids <- read.csv("data/DAs/2016_92-151_XBB.csv")
+wt_centroids <- read.csv("data/DAs/2016/2016_92-151_XBB.csv")
 wt_centroids <- wt_centroids[!duplicated(wt_centroids[,c('DAuid.ADidu')]),] # select unique DA rows
 wt_centroids <- st_as_sf(wt_centroids, coords = c("DArplong.ADlong", "DArplat.Adlat"), crs = 4326) %>% 
   st_transform(crs(lines)) # project to statscan lambert conformal conic
 ### remove DA 35510090 - falls completely in coastal water and is not included in the DA boundary file
 wt_centroids <- wt_centroids %>% filter(DAuid.ADidu != 35510090) 
+wt_centroids_2016 <- wt_centroids
 
+# 2023
+wt_centroids <- read.csv("data/DAs/2021/2021_92-151_X.csv")
+wt_centroids <- wt_centroids[!duplicated(wt_centroids[,c('DBUID_IDIDU')]),] # select unique DA rows
+wt_centroids <- st_as_sf(wt_centroids, coords = c("DARPLONG_ADLONG", "DARPLAT_ADLAT"), crs = 4326) %>% 
+  st_transform(crs(lines)) # project to statscan lambert conformal conic
 
 ### LOAD CENSUS & CAN-ALE DATA FOR CORRELATION ANALYSIS 
 
@@ -36,15 +44,23 @@ can_ale <- read.csv("data/Can-ALE/CanALE_2016.csv")
 api <- source("code/personal_paths_and_variables.R")
 
 #Census: extract census bike, walk, & transit to work variables for all DAs in Canada 
-census_data <- get_census(dataset='CA16', regions=list(C="01"), 
-                          vectors=c("v_CA16_5807", "v_CA16_5804","v_CA16_5801", "v_CA16_5792"), level='DA')
+# census_data <- get_census(dataset='CA16', regions=list(C="01"), 
+#                           vectors=c("v_CA16_5807", "v_CA16_5804","v_CA16_5801", "v_CA16_5792"), level='DA')
+
+census_data <- get_census(dataset='CA21', regions=list(C="01"), 
+                          vectors=c(bicycle = "v_CA21_7650", 
+                                    walked = "v_CA21_7647",
+                                    public_transit = "v_CA21_7644", 
+                                    total_jtw = "v_CA21_7632"), level='DA')
 
 #Calculate sustainable transportation to work total (sum of walk/bicycle/public transit)
-census_data$st <- rowSums(census_data[,c("v_CA16_5807: Bicycle", "v_CA16_5804: Walked", "v_CA16_5801: Public transit")])
+census_data$st <- rowSums(census_data[,c("bicycle", 
+                                         "walked", 
+                                         "public_transit")])
 
 #calculate DA bike-to-work and active transport-to-work rates
-census_data$bike_per <- census_data$`v_CA16_5807: Bicycle`/census_data$`v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`
-census_data$st_per <- census_data$st/census_data$`v_CA16_5792: Total - Main mode of commuting for the employed labour force aged 15 years and over in private households with a usual place of work or no fixed workplace address - 25% sample data`
+census_data$bike_per <- census_data$bicycle / census_data$total_jtw
+census_data$st_per <- census_data$st/census_data$total_jtw
 
 ### CREATE BUFFERS AROUND CENTROIDS
 

@@ -32,7 +32,15 @@ presence_levels <- c("Can-BICS",
 ################################################################################
 # source: shapefile of census subdivisions digital boundary file
 # https://www12.statcan.gc.ca/census-recensement/2011/geo/bound-limit/bound-limit-2016-eng.cfm
-csds <- st_read("C:/Users/16043/Documents/basemap/census_2021/census_csd_boundary/lcsd000b21a_e.shp")
+csds <- st_read("C:/Users/16043/Documents/basemap/census_2021/census_csd_boundary/lcsd000a21a_e.shp")
+pr <- st_read("C:/Users/16043/Documents/basemap/census_2021/census_pr_boundary/lpr_000a21a_e.shp")
+
+# add the province name to the csds
+csds <- csds %>%
+  left_join(pr %>% 
+              st_drop_geometry() %>%
+              dplyr::select(PRUID,
+                            PRNAME))
 
 ################################################################################
 # Landcover

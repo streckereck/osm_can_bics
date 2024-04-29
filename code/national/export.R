@@ -19,6 +19,9 @@ dbDisconnect(conn)
 
 highways <- data.frame()
 
+# for qc in 2018
+tables_highways_predicted <- "highways_predicted_qc_2018_2018"
+
 # select desired fields
 desired_columns <- c(desired_osm_columns,
                      "CSDNAME",
@@ -118,7 +121,7 @@ st_write((highways_output %>%
                          CBICS_infr = Can_BICS, 
                          CBICS_comf = Can_BICS_class) %>%
             st_collection_extract("LINESTRING")),
-            "data/national/OSM_CAN_BICS_v3.shp",
+            "data/national/OSM_CAN_BICS_qc_2018.shp",
            overwrite = T,
            delete_dsn = T)
 

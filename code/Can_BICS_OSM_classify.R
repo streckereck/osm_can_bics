@@ -12,7 +12,8 @@ bikes_designated <- function(osm_dataframe){
 }
 
 bikes_suggested <- function(osm_dataframe){
-  osm_dataframe$bicycle %in% c("yes", "permissive") 
+  osm_dataframe$bicycle %in% c("yes", "permissive") |
+    osm_dataframe$segregated %in% c("yes", "no")
 }
 
 bikes_restricted <- function(osm_dataframe){
@@ -206,7 +207,8 @@ foot_designated <- function(osm_dataframe){
 }
 
 foot_suggested <- function(osm_dataframe){
-  osm_dataframe$foot %in% c("yes")
+  osm_dataframe$foot %in% c("yes") | 
+  osm_dataframe$segregated %in% c("yes", "no")
 }
 
 foot_indicated <- function(osm_dataframe){

@@ -40,8 +40,8 @@ try(conn <- dbConnect(PostgreSQL(),
                       dbname = central_db_name,
                       user = "postgres"))
   tables <- dbListTables(conn)
-  tables_highways <- tables[str_detect(tables, "highways_[:alpha:]+$")]
-  tables_roudabouts <- tables[grep("round*", tables)]
+  tables_highways <- tables[str_detect(tables, "highways_[:alpha:]+_2018$")]
+  tables_roudabouts <- tables[str_detect(tables, "roundabouts_[:alpha:]+_2018")]
 dbDisconnect(conn)
 
 
@@ -55,15 +55,17 @@ tables_highways <- tables_highways[order(tables_highways)]
 tables_roudabouts <- tables_roudabouts[order(tables_roudabouts)]
 
 test <- grep("nb",tables_highways)
+test_n <- grep("yt",tables_highways)
+
 western <- grep("bc", tables_highways)
 prairies <- grep("ab|mb|sk", tables_highways)
 ontario <- grep("on", tables_highways)
 quebec <- grep("qc", tables_highways)
 eastcoast <- grep("nb|pei|nf|ns", tables_highways)
-northern <- grep("nvt|nwt|yt", tables_highways)
+northern <- grep("nwt|nvt|yt", tables_highways) #nvt|yt
 
 subset_data <- T
-subset_select <- c(northern)
+subset_select <- c(quebec)
 
 if(subset_data){
   tables_highways <- tables_highways[subset_select]
@@ -74,8 +76,12 @@ if(subset_data){
     name <- tables_highways[i]
     print(name)
     prov_name <- name %>%
-      str_extract("[^\\_]+$")
+      str_remove("highways_") %>%
+      str_remove("_2024")
     
+    # prov_name <- name %>%
+    #   str_extract("[^\\_]+$")
+
     try(conn <- dbConnect(PostgreSQL(), 
                           dbname = central_db_name,
                           user = "postgres"))
@@ -83,9 +89,11 @@ if(subset_data){
                         st_read(dsn = conn,
                                 layer = tables_highways[i])))
       
-      do.call("<-",list("roundabouts",
+      if(!is.na(tables_roudabouts[i])){      
+        do.call("<-",list("roundabouts",
                       st_read(dsn = conn,
                               layer = tables_roudabouts[i])))
+        }
     dbDisconnect(conn)
       
   # classify
@@ -100,7 +108,7 @@ if(subset_data){
   }
     
   # check for empty data, if empty, use an empty dataframe
-    if(nrow(roundabouts) == 0){
+    if(is.na(tables_roudabouts[i]) | nrow(roundabouts) == 0){
       try(conn <- dbConnect(PostgreSQL(), 
                             dbname = central_db_name,
                             user = "postgres"))
@@ -123,7 +131,7 @@ if(subset_data){
                           user = "postgres"))
       st_write(highways_predicted,  
              dsn = conn, 
-             layer = paste0("highways_predicted_", prov_name),
+             layer = paste0("highways_predicted_", prov_name, "_2018"),
              delete_dsn = T)
     dbDisconnect(conn)
   }
